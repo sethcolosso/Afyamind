@@ -1,0 +1,42 @@
+{
+  "folders": [
+    {
+      "name": "🌿 AfyaMind — Full Project",
+      "path": "."
+    },
+    {
+      "name": "Frontend (HTML)",
+      "path": "./frontend"
+    },
+    {
+      "name": "Backend (Node/Express)",
+      "path": "./backend"
+    }
+  ],
+  "settings": {
+    "editor.fontSize": 14,
+    "editor.tabSize": 2,
+    "editor.formatOnSave": true,
+    "editor.wordWrap": "on",
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.git": true
+    },
+    "emmet.includeLanguages": {
+      "javascript": "javascriptreact"
+    },
+    "liveServer.settings.port": 5500,
+    "liveServer.settings.CustomBrowser": "chrome",
+    "liveServer.settings.root": "/frontend"
+  },
+  "extensions": {
+    "recommendations": [
+      "ritwickdey.LiveServer",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "christian-kohler.path-intellisense",
+      "PKief.material-icon-theme",
+      "formulahendry.auto-rename-tag"
+    ]
+  }
+}

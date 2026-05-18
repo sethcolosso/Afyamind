@@ -1,6 +1,6 @@
 /**
  * AfyaMind Backend Server
- * Express + Anthropic Claude API
+ * Express + Google Gemini API
  *
  * Run: node server.js  OR  npm run dev (with nodemon)
  */
@@ -9,15 +9,14 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
-const Anthropic = require("@anthropic-ai/sdk");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ── Anthropic client ──────────────────────────────────────────
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+// ── Gemini client ────────────────────────────────────────────
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
 // ── Middleware ─────────────────────────────────────────────────
 app.use(express.json({ limit: "10kb" }));
@@ -146,15 +145,23 @@ app.post("/api/triage", aiLimiter, async (req, res) => {
         ? "\n\nIMPORTANT: The user has selected Swahili. Please respond primarily in Swahili."
         : "");
 
-    // Call Claude API
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 600,
-      system: systemPrompt,
-      messages: validMessages,
+    // Convert messages to Gemini format (only user/assistant alternating content)
+    const contents = validMessages.map((m) => ({
+      role: m.role === "user" ? "user" : "model",
+      parts: [{ text: m.content }],
+    }));
+
+    // Call Gemini API
+    const response = await model.generateContent({
+      contents,
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        maxOutputTokens: 600,
+        temperature: 0.7,
+      },
     });
 
-    const replyText = response.content[0]?.text || "";
+    const replyText = response.response.text() || "";
 
     // Detect crisis in the reply (Claude flagged it)
     const isCrisis =
@@ -166,19 +173,19 @@ app.post("/api/triage", aiLimiter, async (req, res) => {
       reply: replyText,
       isCrisis,
       usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
+        inputTokens: response.response.usageMetadata?.promptTokenCount || 0,
+        outputTokens: response.response.usageMetadata?.candidatesTokenCount || 0,
       },
     });
   } catch (error) {
     console.error("Triage API error:", error.message);
 
-    if (error.status === 401) {
+    if (error.message?.includes("API key")) {
       return res
         .status(500)
-        .json({ error: "API key invalid. Check your ANTHROPIC_API_KEY in .env" });
+        .json({ error: "API key invalid. Check your GEMINI_API_KEY in .env" });
     }
-    if (error.status === 429) {
+    if (error.message?.includes("429")) {
       return res
         .status(429)
         .json({ error: "API rate limit reached. Please wait a moment." });
@@ -214,24 +221,30 @@ app.post("/api/mood/insights", aiLimiter, async (req, res) => {
       )
       .join("\n");
 
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 300,
-      messages: [
+    const response = await model.generateContent({
+      contents: [
         {
           role: "user",
-          content: `You are a wellness data analyst for AfyaMind. Analyze these mood logs and provide 2-3 short, warm, actionable insights. Be encouraging, not clinical. Keep each insight to 1-2 sentences. Focus on patterns, not judgments.
+          parts: [
+            {
+              text: `You are a wellness data analyst for AfyaMind. Analyze these mood logs and provide 2-3 short, warm, actionable insights. Be encouraging, not clinical. Keep each insight to 1-2 sentences. Focus on patterns, not judgments.
 
 Mood logs:
 ${logsText}
 
 Respond with exactly 3 insights as a JSON array:
 {"insights": ["insight 1", "insight 2", "insight 3"]}`,
+            },
+          ],
         },
       ],
+      generationConfig: {
+        maxOutputTokens: 300,
+        temperature: 0.7,
+      },
     });
 
-    const text = response.content[0]?.text || "{}";
+    const text = response.response.text() || "{}";
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { insights: [] };
 
@@ -248,6 +261,6 @@ app.listen(PORT, () => {
   console.log(`   Health check: http://localhost:${PORT}/`);
   console.log(`   Triage endpoint: POST http://localhost:${PORT}/api/triage`);
   console.log(
-    `\n   Make sure ANTHROPIC_API_KEY is set in backend/.env\n`
+    `\n   Make sure GEMINI_API_KEY is set in backend/.env\n`
   );
 });

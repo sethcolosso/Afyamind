@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find a Therapist — AfyaMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div class="find-help-layout">
+  <div class="providers-panel">
+    <div class="filters-bar">
+      <input class="search-input" type="text" placeholder="🔍 Search by name, speciality, or location...">
+      <div class="filter-pills" style="margin-top:12px;">
+        <button class="pill active">All</button>
+        <button class="pill">Therapist</button>
+        <button class="pill">Psychiatrist</button>
+        <button class="pill">Counsellor</button>
+        <button class="pill">Coach</button>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="pill">🗣 Swahili</button>
+        <button class="pill">💻 Video</button>
+        <button class="pill">📍 In-person</button>
+        <button class="pill active">Today</button>
+      </div>
+    </div>
+    <div style="padding:12px 16px;font-size:13px;color:var(--text-muted);border-bottom:1px solid var(--border);">Showing <strong style="color:var(--text);">47 providers</strong></div>
+    <div class="provider-list">
+      <div class="provider-card">
+        <div class="provider-top">
+          <div class="provider-avatar" style="background:linear-gradient(135deg,var(--primary),#1D9E75);">AH<div class="verified-badge">✓</div></div>
+          <div class="provider-info">
+            <div class="provider-name">Dr. Amina Hassan</div>
+            <div class="provider-creds">MScCP · KPA Registered</div>
+            <div class="provider-rating">★★★★★ <span>4.9</span> <span style="color:var(--text-muted);">(47 reviews)</span></div>
+          </div>
+        </div>
+        <div class="provider-tags">
+          <span class="tag">Anxiety</span><span class="tag">Depression</span><span class="tag">Trauma</span>
+        </div>
+        <div class="provider-details">
+          <div>🇰🇪 Swahili, English · 💻 Video, In-person</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div class="provider-price">KES 2,500 / session</div>
+          <div class="provider-next">Tomorrow at 10:00 AM</div>
+        </div>
+        <div class="provider-actions">
+          <button class="btn-sm btn-sm-outline">View Profile</button>
+          <button class="btn-sm btn-sm-primary">Book Session</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="map-panel">
+    <div class="map-placeholder">
+      <div style="font-size:48px;margin-bottom:12px;">🗺️</div>
+      <h3>Provider Map</h3>
+      <p style="font-size:14px;max-width:280px;line-height:1.6;">Interactive map showing providers near you.</p>
+      <button class="btn btn-primary" style="margin-top:20px;">Enable Location</button>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('header.html').then(r => r.text()).then(html => {
+    document.getElementById('header-container').innerHTML = html;
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wellness Exercises — AfyaMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<section style="padding:40px;">
+  <div class="container">
+    <h1 style="font-size:32px;margin-bottom:12px;text-align:center;">🧘 Wellness Exercises</h1>
+    <p style="text-align:center;color:var(--text-sec);margin-bottom:40px;">Guided exercises to calm your mind and body.</p>
+
+    <div class="exercises-grid">
+      <div class="exercise-card" onclick="openBreathing()">
+        <div class="exercise-icon">💨</div>
+        <div class="exercise-title">Box Breathing</div>
+        <p class="exercise-desc">A simple 4-4-4-4 breathing technique to calm anxiety instantly.</p>
+        <button class="btn btn-primary" style="font-size:13px;padding:8px 16px;">Start →</button>
+      </div>
+      <div class="exercise-card">
+        <div class="exercise-icon">🧘</div>
+        <div class="exercise-title">Grounding Exercise</div>
+        <p class="exercise-desc">Feel present and safe using the 5-4-3-2-1 technique.</p>
+        <button class="btn btn-primary" style="font-size:13px;padding:8px 16px;">Start →</button>
+      </div>
+      <div class="exercise-card">
+        <div class="exercise-icon">📝</div>
+        <div class="exercise-title">Gratitude Journaling</div>
+        <p class="exercise-desc">Shift your mindset by noticing three good things.</p>
+        <button class="btn btn-primary" style="font-size:13px;padding:8px 16px;">Start →</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="breathing-modal" id="breathingModal">
+  <button class="breathing-close" onclick="closeBreathing()">✕</button>
+  <div class="breathing-circle-wrap">
+    <div class="breathing-circle" id="breathingCircle">
+      <div><div class="breathing-phase" id="breathPhase">Breathe in...</div><div class="breathing-timer" id="breathTimer">4</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('header.html').then(r => r.text()).then(html => {
+    document.getElementById('header-container').innerHTML = html;
+  });
+});
+</script>
+</body>
+</html>

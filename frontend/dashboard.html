@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — AfyaMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div class="dashboard-layout">
+  <div class="sidebar">
+    <div class="sidebar-user">
+      <div class="sidebar-avatar">WK</div>
+      <div>
+        <div class="sidebar-name">Wanjiru K.</div>
+        <div class="sidebar-role">Member since 2026</div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="sidebar-link active">🏠 <span>Overview</span></div>
+      <div class="sidebar-link">📊 <span>Mood Tracker</span></div>
+      <div class="sidebar-link">📓 <span>My Journal</span></div>
+      <div class="sidebar-link">📅 <span>My Sessions</span></div>
+      <div class="sidebar-link">🧘 <span>Exercises</span></div>
+      <div class="sidebar-link">📚 <span>My Courses</span></div>
+      <div class="sidebar-link">🤝 <span>Community</span></div>
+      <div class="sidebar-link">🌱 <span>Addiction Support</span></div>
+      <div class="sidebar-link">📰 <span>Resources</span></div>
+      <div class="sidebar-link">⚙️ <span>Settings</span></div>
+      <div class="divider"></div>
+      <div class="sidebar-link sos" onclick="openCrisis()">🆘 <span>SOS / Crisis</span></div>
+    </div>
+  </div>
+  <div class="dashboard-main">
+    <div class="welcome-bar">
+      <h2>Good morning, Wanjiru ☀️</h2>
+      <p>How are you feeling today? <em style="color:var(--primary);">Tip: Gratitude journaling has been linked to improved mood and sleep.</em></p>
+    </div>
+    <div class="dash-cards">
+      <div class="dash-card">
+        <div class="dash-card-label">Mood Streak</div>
+        <div class="dash-card-value">7 days 🔥</div>
+        <div class="dash-card-sub">Keep it going!</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Next Session</div>
+        <div class="dash-card-value" style="font-size:16px;">Dr. Amina</div>
+        <div class="dash-card-sub" style="color:var(--primary);font-weight:600;">Tomorrow 10:00 AM</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Course Progress</div>
+        <div class="dash-card-value" style="font-size:16px;">60%</div>
+        <div class="dash-card-sub">Managing Anxiety · Week 4</div>
+      </div>
+      <div class="dash-card">
+        <div class="dash-card-label">Community</div>
+        <div class="dash-card-value" style="font-size:16px;">3 new 💬</div>
+        <div class="dash-card-sub">Anxiety Support Group</div>
+      </div>
+    </div>
+    <div class="dash-full">
+      <div class="dash-widget">
+        <h3>Today's Mood Check-In</h3>
+        <p style="font-size:14px;color:var(--text-sec);margin-bottom:12px;">How are you feeling right now?</p>
+        <div class="mood-check">
+          <button class="mood-btn" onclick="selectDashMood(this)">😔</button>
+          <button class="mood-btn" onclick="selectDashMood(this)">😟</button>
+          <button class="mood-btn" onclick="selectDashMood(this)">😐</button>
+          <button class="mood-btn selected" onclick="selectDashMood(this)">🙂</button>
+          <button class="mood-btn" onclick="selectDashMood(this)">😊</button>
+        </div>
+        <input class="search-input" style="margin:12px 0;" placeholder="Add a word (optional): tired, hopeful, anxious...">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <button class="pill">Work</button><button class="pill active">Relationships</button>
+          <button class="pill">Sleep</button><button class="pill">Health</button>
+        </div>
+        <button class="btn btn-primary" onclick="this.textContent='✓ Mood logged!';this.style.background='var(--success)';">Log Mood</button>
+        <div class="mood-chart-placeholder" id="moodChart" style="margin-top:20px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('header.html').then(r => r.text()).then(html => {
+    document.getElementById('header-container').innerHTML = html;
+    buildMoodChart();
+  });
+});
+</script>
+</body>
+</html>

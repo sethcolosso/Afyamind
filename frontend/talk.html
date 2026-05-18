@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Talk to Afya — AfyaMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div class="triage-layout">
+  <div class="triage-sidebar">
+    <div class="afya-avatar">🌿</div>
+    <h2>Afya</h2>
+    <p class="subtitle">Your wellness guide</p>
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      <span class="status-text">Available now</span>
+    </div>
+    <div class="divider"></div>
+    <div class="info-box">
+      <strong style="display:block;margin-bottom:6px;color:var(--text);">About Afya</strong>
+      Afya is AfyaMind's AI wellness guide. She listens without judgment, helps you understand what you are experiencing, and connects you to the right human support. She speaks Swahili and English.
+      <br><br>
+      <em style="color:var(--text-muted);font-size:13px;">Afya does not diagnose. She guides.</em>
+    </div>
+    <div class="privacy-note">🔒 <span>This conversation is private and encrypted.</span></div>
+    <div class="anon-toggle">
+      <span style="font-size:14px;font-weight:600;">Chat anonymously</span>
+      <div class="toggle"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="pill active" id="lang-pill-en" onclick="setLangPill('en')">EN</button>
+      <button class="pill" id="lang-pill-sw" onclick="setLangPill('sw')">SW</button>
+    </div>
+    <a class="sos-link" onclick="openCrisis()">🆘 In immediate crisis? Get help now →</a>
+  </div>
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:18px;">🌿</div>
+      <div>
+        <h3>Chat with Afya</h3>
+        <div style="font-size:12px;color:var(--text-muted);">AI Wellness Guide · Responds instantly</div>
+      </div>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg msg-ai">
+        <div class="msg-dot">🌿</div>
+        <div>
+          <div class="msg-bubble">Hujambo! I'm Afya, your wellness guide. I'm here to listen without judgment and help you find the support you need. How are you feeling today? 💚</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Afya · Just now</div>
+        </div>
+      </div>
+    </div>
+    <div class="quick-chips" id="quickChips">
+      <button class="quick-chip" onclick="sendQuick('I feel anxious')">I feel anxious</button>
+      <button class="quick-chip" onclick="sendQuick('I am struggling with addiction')">Addiction support</button>
+      <button class="quick-chip" onclick="sendQuick('I need a therapist')">Find a therapist</button>
+      <button class="quick-chip" onclick="sendQuick('I feel depressed')">I feel depressed</button>
+      <button class="quick-chip" onclick="sendQuick('I am in crisis')">I am in crisis</button>
+    </div>
+    <div class="chat-input-area">
+      <input class="chat-input" id="chatInput" placeholder="Type your message... / Andika ujumbe wako..." onkeydown="if(event.key==='Enter')sendMessage()">
+      <button class="chat-send" onclick="sendMessage()">➤</button>
+    </div>
+    <div style="padding:8px 24px;font-size:12px;color:var(--text-muted);text-align:center;">Afya is not a substitute for professional care. In crisis? <a href="#" style="color:var(--danger);font-weight:600;" onclick="openCrisis()">Get help now</a></div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+const API_BASE = 'http://localhost:3001';
+let chatHistory = [];
+let currentLang = 'en';
+
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('header.html').then(r => r.text()).then(html => {
+    document.getElementById('header-container').innerHTML = html;
+  });
+});
+
+function setLangPill(lang) {
+  currentLang = lang;
+  document.getElementById('lang-pill-en').classList.toggle('active', lang === 'en');
+  document.getElementById('lang-pill-sw').classList.toggle('active', lang === 'sw');
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  document.getElementById('quickChips').style.display = 'none';
+  addMessage(text, 'user');
+  input.value = '';
+  chatHistory.push({ role: 'user', content: text });
+
+  showTyping();
+
+  try {
+    const response = await fetch(`${API_BASE}/api/triage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: chatHistory,
+        language: currentLang
+      })
+    });
+
+    hideTyping();
+
+    if (!response.ok) {
+      const err = await response.json();
+      addMessage(`Sorry, something went wrong: ${err.error || 'Please try again.'}`, 'ai');
+      chatHistory.pop();
+      return;
+    }
+
+    const data = await response.json();
+    const reply = data.reply;
+    chatHistory.push({ role: 'assistant', content: reply });
+    addMessage(reply, 'ai');
+
+    if (data.isCrisis) {
+      setTimeout(() => openCrisis(), 800);
+    }
+  } catch (err) {
+    hideTyping();
+    console.error('API connection error:', err);
+    addMessage(
+      'I cannot connect to the server right now. Make sure the backend is running (cd backend && npm run dev). \n\nFor immediate help: Befrienders Kenya +254 722 178 177 💚',
+      'ai'
+    );
+  }
+}
+
+function sendQuick(t) {
+  document.getElementById('chatInput').value = t;
+  sendMessage();
+}
+</script>
+</body>
+</html>

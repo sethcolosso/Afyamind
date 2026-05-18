@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community — AfyaMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="header-container"></div>
+
+<div class="community-layout">
+  <div class="groups-sidebar">
+    <input class="search-input" placeholder="🔍 Find a group...">
+    <h3>My Groups</h3>
+    <div class="group-item active">
+      <div class="group-icon" style="background:var(--primary-light);">😰</div>
+      <div><div class="group-name">Anxiety Support</div><div class="group-members">2,341 members</div></div>
+      <div class="unread-badge">3</div>
+    </div>
+    <h3>Suggested</h3>
+    <div class="group-item">
+      <div class="group-icon" style="background:var(--purple-light);">💙</div>
+      <div><div class="group-name">Depression Circle</div><div class="group-members">1,892 members</div></div>
+    </div>
+    <div class="group-item">
+      <div class="group-icon" style="background:#FEF3E0;">🌸</div>
+      <div><div class="group-name">Women's Wellness</div><div class="group-members">3,210 members</div></div>
+    </div>
+  </div>
+  <div class="feed-main">
+    <div class="group-header-bar">
+      <div class="group-header-info">
+        <h2>😰 Anxiety Support</h2>
+        <p>2,341 members · Moderated by certified counsellors</p>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span class="session-badge badge-teal">✓ Moderated</span>
+        <button class="btn btn-secondary" style="font-size:13px;padding:7px 16px;">Joined</button>
+      </div>
+    </div>
+    <div class="feed-post">
+      <div class="post-header">
+        <div class="anon-avatar" style="background:var(--primary-light);">🌿</div>
+        <div><div class="post-author" style="color:var(--primary);">Community Guide</div><div class="post-time">Welcome</div></div>
+      </div>
+      <p class="post-text">Welcome to Anxiety Support! This is a safe, anonymous space where you can share your experiences. Be respectful, supportive, and kind. 💚</p>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('header.html').then(r => r.text()).then(html => {
+    document.getElementById('header-container').innerHTML = html;
+  });
+});
+</script>
+</body>
+</html>

@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "AfyaMind — Mental wellness platform for East Africa",
   "scripts": {
+    "dev": "cd backend && npm run dev",
     "install:backend": "cd backend && npm install",
-    "start:backend": "cd backend && npm run dev",
-    "setup": "cd backend && npm install && echo '\\n✅ Setup complete! Now:\\n1. Copy backend/.env.example to backend/.env\\n2. Add your ANTHROPIC_API_KEY\\n3. Run: npm run start:backend\\n4. Open frontend/index.html with Live Server'"
+    "start:backend": "cd backend && npm run dev"
   },
   "author": "AfyaMind",
   "license": "MIT"

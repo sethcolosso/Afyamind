@@ -307,7 +307,7 @@ async function sendMessage() {
 
     // Show recommendation card for therapist requests
     if (/therapist|counsell|specialist/i.test(text)) {
-      setTimeout(() => addRecCard(), 600);
+      setTimeout(() => addRecommendationCard(), 600);
     }
 
   } catch (err) {
@@ -339,6 +339,3 @@ async function checkBackendConnection() {
 }
 checkBackendConnection();
 
-
-</body>
-</html>

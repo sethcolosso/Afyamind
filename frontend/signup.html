@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account — AfyaMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a3a3a 0%, #0f2727 100%);
+    padding: 20px;
+  }
+  .auth-card {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .auth-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .auth-header h1 {
+    font-size: 28px;
+    color: #1a3a3a;
+    margin-bottom: 8px;
+  }
+  .auth-header p {
+    color: #666;
+    font-size: 14px;
+  }
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    display: block;
+    font-weight: 600;
+    color: #1a3a3a;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  .form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+  }
+  .form-group input:focus {
+    outline: none;
+    border-color: #16a085;
+    box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.1);
+  }
+  .submit-btn {
+    width: 100%;
+    padding: 12px;
+    background: #16a085;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: background 0.3s;
+  }
+  .submit-btn:hover {
+    background: #0e7b5c;
+  }
+  .submit-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  .auth-link {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 14px;
+    color: #666;
+  }
+  .auth-link a {
+    color: #16a085;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .error-message {
+    background: #fee;
+    color: #c33;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    display: none;
+  }
+  .success-message {
+    background: #efe;
+    color: #3c3;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-header">
+      <h1>🌿 Get Started</h1>
+      <p>Join AfyaMind — your wellness journey begins here</p>
+    </div>
+
+    <div class="error-message" id="errorMessage"></div>
+    <div class="success-message" id="successMessage"></div>
+
+    <form id="signupForm" onsubmit="handleSignup(event)">
+      <div class="form-group">
+        <label for="firstName">First Name</label>
+        <input type="text" id="firstName" name="firstName" required placeholder="John">
+      </div>
+
+      <div class="form-group">
+        <label for="lastName">Last Name</label>
+        <input type="text" id="lastName" name="lastName" required placeholder="Doe">
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required placeholder="••••••••" minlength="8">
+        <small style="color: #999; display: block; margin-top: 4px;">At least 8 characters</small>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">Create Account</button>
+    </form>
+
+    <div class="auth-link">
+      Already have an account? <a href="login.html">Sign in</a>
+    </div>
+    <div class="auth-link" style="margin-top: 8px;">
+      <a href="home.html">← Back to home</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = 'http://localhost:3001';
+
+async function handleSignup(event) {
+  event.preventDefault();
+  const firstName = document.getElementById('firstName').value;
+  const lastName = document.getElementById('lastName').value;
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const submitBtn = document.getElementById('submitBtn');
+  const errorMsg = document.getElementById('errorMessage');
+  const successMsg = document.getElementById('successMessage');
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Creating account...';
+  errorMsg.style.display = 'none';
+  successMsg.style.display = 'none';
+
+  try {
+    const response = await fetch(`${API_BASE}/api/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, firstName, lastName })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Signup failed');
+    }
+
+    localStorage.setItem('afya_token', data.token);
+    localStorage.setItem('afya_user', JSON.stringify(data.user));
+
+    successMsg.textContent = '✓ Account created! Redirecting...';
+    successMsg.style.display = 'block';
+
+    setTimeout(() => window.location.href = 'talk.html', 1500);
+  } catch (error) {
+    errorMsg.textContent = '✗ ' + error.message;
+    errorMsg.style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Create Account';
+  }
+}
+</script>
+
+</body>
+</html>

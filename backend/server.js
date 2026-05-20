@@ -1,6 +1,6 @@
 /**
  * AfyaMind Backend Server
- * Express + Google Gemini API
+ * Express + Google Gemini API + Supabase
  *
  * Run: node server.js  OR  npm run dev (with nodemon)
  */
@@ -10,6 +10,9 @@ const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const supabase = require("./supabase");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,15 +32,139 @@ app.use(
       "http://127.0.0.1:3000",
     ],
     methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// ── JWT Middleware ────────────────────────────────────────────
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "No token provided" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ error: "Invalid or expired token" });
+  }
+};
 
 // Rate limiting — protect the AI endpoint
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 20,             // 20 requests per minute per IP
   message: { error: "Too many requests. Please wait a moment." },
+});
+
+// Auth limiter
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "Too many auth attempts. Try again later." },
+});
+
+// ── AUTH ENDPOINTS ──────────────────────────────────────────────
+
+app.post("/api/auth/signup", authLimiter, async (req, res) => {
+  try {
+    const { email, password, firstName, lastName } = req.body;
+
+    if (!email || !password || !firstName || !lastName) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    // Check if user exists
+    const { data: existing } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (existing) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const { data: user, error } = await supabase
+      .from("users")
+      .insert({
+        email,
+        password_hash: hashedPassword,
+        first_name: firstName,
+        last_name: lastName,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Create profile
+    await supabase.from("user_profiles").insert({
+      user_id: user.id,
+      preferred_language: "en",
+    });
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRY }
+    );
+
+    res.status(201).json({
+      token,
+      user: { id: user.id, email: user.email, firstName: user.first_name },
+    });
+  } catch (error) {
+    console.error("Signup error:", error.message);
+    res.status(500).json({ error: "Failed to create account" });
+  }
+});
+
+app.post("/api/auth/login", authLimiter, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password required" });
+    }
+
+    // Find user
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (error || !user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Verify password
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRY }
+    );
+
+    res.json({
+      token,
+      user: { id: user.id, email: user.email, firstName: user.first_name },
+    });
+  } catch (error) {
+    console.error("Login error:", error.message);
+    res.status(500).json({ error: "Login failed" });
+  }
 });
 
 // ── AFYA SYSTEM PROMPT ────────────────────────────────────────
@@ -93,30 +220,19 @@ Remember: You are a warm, culturally-grounded guide. You hold space. You do not 
 
 // ── ROUTES ────────────────────────────────────────────────────
 
-// Health check
-app.get("/", (req, res) => {
-  res.json({
-    status: "AfyaMind API is running 🌿",
-    version: "1.0.0",
-    endpoints: {
-      triage: "POST /api/triage",
-      moodInsights: "POST /api/mood/insights",
-    },
-  });
-});
-
 /**
  * POST /api/triage
- * Main Afya AI chat endpoint
+ * Main Afya AI chat endpoint (requires auth)
  *
  * Body: {
  *   messages: [{ role: "user"|"assistant", content: string }],
  *   language?: "en" | "sw"
  * }
  */
-app.post("/api/triage", aiLimiter, async (req, res) => {
+app.post("/api/triage", verifyToken, aiLimiter, async (req, res) => {
   try {
     const { messages, language = "en" } = req.body;
+    const userId = req.user.id;
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "messages array is required" });
@@ -132,11 +248,13 @@ app.post("/api/triage", aiLimiter, async (req, res) => {
           typeof m.content === "string" &&
           m.content.trim().length > 0
       )
-      .slice(-20); // Keep last 20 messages for context window
+      .slice(-20);
 
     if (validMessages.length === 0) {
       return res.status(400).json({ error: "No valid messages provided" });
     }
+
+    const userMessage = validMessages[validMessages.length - 1];
 
     // Add language hint to system prompt
     const systemPrompt =
@@ -145,7 +263,7 @@ app.post("/api/triage", aiLimiter, async (req, res) => {
         ? "\n\nIMPORTANT: The user has selected Swahili. Please respond primarily in Swahili."
         : "");
 
-    // Convert messages to Gemini format (only user/assistant alternating content)
+    // Convert messages to Gemini format
     const contents = validMessages.map((m) => ({
       role: m.role === "user" ? "user" : "model",
       parts: [{ text: m.content }],
@@ -162,12 +280,19 @@ app.post("/api/triage", aiLimiter, async (req, res) => {
     });
 
     const replyText = response.response.text() || "";
-
-    // Detect crisis in the reply (Claude flagged it)
     const isCrisis =
       /befrienders|crisis line|1199|\+254 722|call now|immediate danger|emergency/i.test(
         replyText
       );
+
+    // Save chat history
+    await supabase.from("chat_history").insert({
+      user_id: userId,
+      user_message: userMessage.content,
+      assistant_reply: replyText,
+      language,
+      is_crisis: isCrisis,
+    });
 
     res.json({
       reply: replyText,
@@ -197,13 +322,13 @@ app.post("/api/triage", aiLimiter, async (req, res) => {
 
 /**
  * POST /api/mood/insights
- * Generate AI insights from mood log data
+ * Generate AI insights from mood log data (requires auth)
  *
  * Body: {
  *   moodLogs: [{ score: 1-5, label: string, triggers: string[], date: string }]
  * }
  */
-app.post("/api/mood/insights", aiLimiter, async (req, res) => {
+app.post("/api/mood/insights", verifyToken, aiLimiter, async (req, res) => {
   try {
     const { moodLogs } = req.body;
 
@@ -255,12 +380,124 @@ Respond with exactly 3 insights as a JSON array:
   }
 });
 
-// ── START ─────────────────────────────────────────────────────
+// ── MOOD LOG ENDPOINTS ──────────────────────────────────────────
+
+app.post("/api/mood/log", verifyToken, async (req, res) => {
+  try {
+    const { score, label, triggers } = req.body;
+    const userId = req.user.id;
+
+    if (!score || score < 1 || score > 5) {
+      return res.status(400).json({ error: "Score must be between 1-5" });
+    }
+
+    const { data, error } = await supabase
+      .from("mood_logs")
+      .insert({
+        user_id: userId,
+        score,
+        label: label || null,
+        triggers: triggers || [],
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Mood log error:", error.message);
+    res.status(500).json({ error: "Failed to save mood log" });
+  }
+});
+
+app.get("/api/mood/logs", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { data, error } = await supabase
+      .from("mood_logs")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (error) {
+    console.error("Get mood logs error:", error.message);
+    res.status(500).json({ error: "Failed to fetch mood logs" });
+  }
+});
+
+// ── CHAT HISTORY ENDPOINTS ──────────────────────────────────────
+
+app.get("/api/chat/history", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { data, error } = await supabase
+      .from("chat_history")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (error) {
+    console.error("Get chat history error:", error.message);
+    res.status(500).json({ error: "Failed to fetch chat history" });
+  }
+});
+
+// ── USER PROFILE ENDPOINTS ──────────────────────────────────────
+
+app.get("/api/user/profile", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const { data: profile, error } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (error) throw error;
+
+    const { data: user } = await supabase
+      .from("users")
+      .select("id, email, first_name, last_name")
+      .eq("id", userId)
+      .single();
+
+    res.json({ ...user, profile });
+  } catch (error) {
+    console.error("Get profile error:", error.message);
+    res.status(500).json({ error: "Failed to fetch profile" });
+  }
+});
+
+app.put("/api/user/profile", verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { preferred_language, phone, bio } = req.body;
+
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .update({ preferred_language, phone, bio })
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (error) {
+    console.error("Update profile error:", error.message);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// Start server
 app.listen(PORT, () => {
-  console.log(`\n🌿 AfyaMind API running on http://localhost:${PORT}`);
-  console.log(`   Health check: http://localhost:${PORT}/`);
-  console.log(`   Triage endpoint: POST http://localhost:${PORT}/api/triage`);
-  console.log(
-    `\n   Make sure GEMINI_API_KEY is set in backend/.env\n`
-  );
+  console.log(`🌿 AfyaMind API running on port ${PORT}`);
 });

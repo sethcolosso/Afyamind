@@ -78,11 +78,84 @@ const API_BASE = 'http://localhost:3001';
 let chatHistory = [];
 let currentLang = 'en';
 
+// ── Auth Utilities ──────────────────────────────────────────
+function getToken() {
+  return localStorage.getItem('afya_token');
+}
+
+function setToken(token) {
+  localStorage.setItem('afya_token', token);
+}
+
+function isAuthenticated() {
+  return !!getToken();
+}
+
+function logout() {
+  localStorage.removeItem('afya_token');
+  window.location.href = 'home.html';
+}
+
+async function apiCall(endpoint, method = 'GET', body = null) {
+  const token = getToken();
+  if (!token) {
+    alert('Please login first');
+    window.location.href = 'home.html';
+    return null;
+  }
+
+  const options = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  };
+
+  if (body) options.body = JSON.stringify(body);
+
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, options);
+    if (response.status === 401) {
+      logout();
+      return null;
+    }
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('API call error:', error);
+    alert('Error: ' + error.message);
+    return null;
+  }
+}
+
+// ── Chat Functions ─────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  if (!isAuthenticated()) {
+    window.location.href = 'home.html';
+    return;
+  }
   fetch('header.html').then(r => r.text()).then(html => {
     document.getElementById('header-container').innerHTML = html;
   });
+  loadChatHistory();
 });
+
+async function loadChatHistory() {
+  const data = await apiCall('/api/chat/history');
+  if (data) {
+    chatHistory = data;
+    document.getElementById('chatMessages').innerHTML = '';
+    const greeting = document.createElement('div');
+    greeting.className = 'msg msg-ai';
+    greeting.innerHTML = `<div class="msg-dot">🌿</div>
+      <div>
+        <div class="msg-bubble">Hujambo! I'm Afya, your wellness guide. I'm here to listen without judgment and help you find the support you need. How are you feeling today? 💚</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Afya · Just now</div>
+      </div>`;
+    document.getElementById('chatMessages').appendChild(greeting);
+  }
+}
 
 function setLangPill(lang) {
   currentLang = lang;
@@ -98,49 +171,74 @@ async function sendMessage() {
   document.getElementById('quickChips').style.display = 'none';
   addMessage(text, 'user');
   input.value = '';
-  chatHistory.push({ role: 'user', content: text });
+
+  // Check for crisis keywords
+  if (/crisis|hurt myself|suicide|die|self.harm/i.test(text)) {
+    openCrisis();
+    addMessage('I am very concerned about your safety right now. I have opened our crisis resources for you. Please reach out to one of those lines immediately — you do not have to face this alone. 💚', 'ai');
+    return;
+  }
 
   showTyping();
 
-  try {
-    const response = await fetch(`${API_BASE}/api/triage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: chatHistory,
-        language: currentLang
-      })
-    });
+  // Call backend API
+  const response = await apiCall('/api/triage', 'POST', {
+    messages: [...chatHistory.map(msg => ({
+      role: msg.user_message ? 'user' : 'assistant',
+      content: msg.user_message || msg.assistant_reply
+    })), { role: 'user', content: text }],
+    language: currentLang
+  });
 
-    hideTyping();
+  hideTyping();
 
-    if (!response.ok) {
-      const err = await response.json();
-      addMessage(`Sorry, something went wrong: ${err.error || 'Please try again.'}`, 'ai');
-      chatHistory.pop();
-      return;
-    }
-
-    const data = await response.json();
-    const reply = data.reply;
-    chatHistory.push({ role: 'assistant', content: reply });
-    addMessage(reply, 'ai');
-
-    if (data.isCrisis) {
-      setTimeout(() => openCrisis(), 800);
-    }
-  } catch (err) {
-    hideTyping();
-    console.error('API connection error:', err);
-    addMessage(
-      'I cannot connect to the server right now.\n\nFor immediate help: Befrienders Kenya +254 722 178 177 💚',
-      'ai'
-    );
+  if (response) {
+    addMessage(response.reply, 'ai');
+    if (response.isCrisis) openCrisis();
   }
 }
 
-function sendQuick(t) {
-  document.getElementById('chatInput').value = t;
+function addMessage(text, sender) {
+  const msgs = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = `msg msg-${sender === 'ai' ? 'ai' : 'user'}`;
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (sender === 'ai') {
+    div.innerHTML = `<div class="msg-dot">🌿</div>
+      <div>
+        <div class="msg-bubble">${text}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Afya · ${time}</div>
+      </div>`;
+  } else {
+    div.innerHTML = `<div class="msg-bubble">${text}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-align:right;">You · ${time}</div>`;
+  }
+
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+  const msgs = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'msg msg-ai msg-typing';
+  div.id = 'typing-indicator';
+  div.innerHTML = `<div class="msg-dot">🌿</div>
+    <div>
+      <div class="msg-bubble"><span>·</span><span>·</span><span>·</span></div>
+    </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function hideTyping() {
+  const typing = document.getElementById('typing-indicator');
+  if (typing) typing.remove();
+}
+
+function sendQuick(text) {
+  document.getElementById('chatInput').value = text;
   sendMessage();
 }
 </script>

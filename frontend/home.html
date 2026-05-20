@@ -22,7 +22,7 @@
       <h1>Your mental health matters.<br><span class="purple">Find support, your way.</span></h1>
       <p class="hero-sub">Connect with therapists, track your mood, and access mental wellness resources — all in Swahili and English, built for East Africa.</p>
       <div class="hero-btns">
-        <button class="btn btn-primary btn-lg" onclick="window.location.href='talk.html'">Get Help Now</button>
+        <button class="btn btn-primary btn-lg" onclick="navigateToChat()">Get Help Now</button>
         <button class="btn btn-secondary btn-lg" onclick="window.location.href='help.html'">Find a Therapist</button>
       </div>
       <div class="hero-stats">
@@ -184,6 +184,15 @@
 
 <script src="common.js"></script>
 <script>
+  function navigateToChat() {
+    const token = localStorage.getItem('afya_token');
+    if (token) {
+      window.location.href = 'talk.html';
+    } else {
+      window.location.href = 'login.html';
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     fetch('header.html').then(r => r.text()).then(html => {
       document.getElementById('header-container').innerHTML = html;

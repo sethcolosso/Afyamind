@@ -89,7 +89,19 @@
 
 <script src="common.js"></script>
 <script>
+function checkAuth() {
+  const token = localStorage.getItem('afya_token');
+  if (!token) {
+    alert('Please login to access the dashboard');
+    window.location.href = 'login.html';
+    return false;
+  }
+  return true;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  if (!checkAuth()) return;
+
   fetch('header.html').then(r => r.text()).then(html => {
     document.getElementById('header-container').innerHTML = html;
     buildMoodChart();

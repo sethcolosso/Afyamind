@@ -220,6 +220,33 @@ Remember: You are a warm, culturally-grounded guide. You hold space. You do not 
 
 // ── ROUTES ────────────────────────────────────────────────────
 
+// Health check
+app.get("/", (req, res) => {
+  res.json({
+    status: "AfyaMind API is running 🌿",
+    version: "1.0.0",
+    endpoints: {
+      auth: {
+        signup: "POST /api/auth/signup",
+        login: "POST /api/auth/login",
+      },
+      chat: {
+        triage: "POST /api/triage (requires auth)",
+        history: "GET /api/chat/history (requires auth)",
+      },
+      mood: {
+        log: "POST /api/mood/log (requires auth)",
+        logs: "GET /api/mood/logs (requires auth)",
+        insights: "POST /api/mood/insights (requires auth)",
+      },
+      profile: {
+        get: "GET /api/user/profile (requires auth)",
+        update: "PUT /api/user/profile (requires auth)",
+      },
+    },
+  });
+});
+
 /**
  * POST /api/triage
  * Main Afya AI chat endpoint (requires auth)

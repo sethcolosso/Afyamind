@@ -131,15 +131,34 @@ async function apiCall(endpoint, method = 'GET', body = null) {
 
 // ── Chat Functions ─────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  if (!isAuthenticated()) {
-    window.location.href = 'home.html';
-    return;
-  }
   fetch('header.html').then(r => r.text()).then(html => {
     document.getElementById('header-container').innerHTML = html;
   });
-  loadChatHistory();
+
+  if (isAuthenticated()) {
+    loadChatHistory();
+  } else {
+    showLoginPrompt();
+  }
 });
+
+function showLoginPrompt() {
+  const chatPanel = document.querySelector('.chat-panel');
+  if (chatPanel) {
+    chatPanel.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;padding:40px;">
+        <div style="font-size:64px;">🌿</div>
+        <h2 style="text-align:center;">Sign in to chat with Afya</h2>
+        <p style="text-align:center;color:var(--text-sec);max-width:300px;">Create an account or sign in to access your personal wellness chat with Afya.</p>
+        <div style="display:flex;gap:12px;">
+          <button class="btn btn-primary" onclick="window.location.href='login.html'" style="padding:12px 28px;">Sign In</button>
+          <button class="btn btn-secondary" onclick="window.location.href='signup.html'" style="padding:12px 28px;">Create Account</button>
+        </div>
+        <a href="home.html" style="color:var(--text-muted);text-decoration:none;margin-top:12px;">← Back to home</a>
+      </div>
+    `;
+  }
+}
 
 async function loadChatHistory() {
   const data = await apiCall('/api/chat/history');

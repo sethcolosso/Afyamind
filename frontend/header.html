@@ -19,11 +19,16 @@
       <button class="active" id="lang-en" onclick="switchLang('en')">EN</button>
       <button id="lang-sw" onclick="switchLang('sw')">SW</button>
     </div>
-    <div id="nav-auth" style="display:flex;gap:12px;">
-      <button class="btn btn-coral" onclick="window.location.href='talk.html'" style="font-size:14px;padding:9px 18px;">Get Help Now</button>
+    <button class="btn btn-coral" onclick="window.location.href='talk.html'" style="font-size:14px;padding:9px 18px;">Get Help Now</button>
+
+    <!-- Logged in: Show Dashboard and Logout -->
+    <div id="nav-logged-in" style="display:none;gap:12px;flex-direction:row;">
       <button class="btn btn-secondary" onclick="window.location.href='dashboard.html'" style="font-size:14px;padding:9px 18px;" id="nav-dashboard">Dashboard</button>
+      <button class="btn btn-secondary" onclick="logout()" style="font-size:14px;padding:9px 18px;">Logout</button>
     </div>
-    <div id="nav-unauth" style="display:none;gap:12px;flex-direction:row;">
+
+    <!-- Not logged in: Show Login and Sign Up -->
+    <div id="nav-logged-out" style="display:flex;gap:12px;flex-direction:row;">
       <button class="btn btn-secondary" onclick="window.location.href='login.html'" style="font-size:14px;padding:9px 18px;">Login</button>
       <button class="btn btn-primary" onclick="window.location.href='signup.html'" style="font-size:14px;padding:9px 18px;">Sign Up</button>
     </div>
@@ -34,15 +39,25 @@
       const token = localStorage.getItem('afya_token');
       const authDiv = document.getElementById('nav-auth');
       const unauthDiv = document.getElementById('nav-unauth');
+
+      console.log('Header: Checking auth. Token present:', !!token);
+
       if (token) {
-        authDiv.style.display = 'flex';
-        unauthDiv.style.display = 'none';
+        if (authDiv) authDiv.style.display = 'flex';
+        if (unauthDiv) unauthDiv.style.display = 'none';
+        console.log('Header: Showing Dashboard buttons');
       } else {
-        authDiv.style.display = 'none';
-        unauthDiv.style.display = 'flex';
+        if (authDiv) authDiv.style.display = 'none';
+        if (unauthDiv) unauthDiv.style.display = 'flex';
+        console.log('Header: Showing Login/Sign Up buttons');
       }
     }
+
+    // Run immediately
     updateNavAuth();
+
+    // Also run when page becomes visible again (in case user switches tabs)
+    document.addEventListener('visibilitychange', updateNavAuth);
   </script>
 </nav>
 

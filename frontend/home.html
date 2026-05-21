@@ -120,11 +120,20 @@
         <p class="feature-desc">Browse 500+ verified providers on an interactive map. Filter by language, speciality, price.</p>
         <a class="feature-link">Learn more →</a>
       </div>
-      <div class="feature-card" onclick="window.location.href='dashboard.html'">
+      <div class="feature-card" id="moodTrackerCard" style="display:none;" onclick="window.location.href='dashboard.html'">
         <div class="feature-icon" style="background:#EAF3DE;">📊</div>
         <div class="feature-title">Mood Tracker</div>
         <p class="feature-desc">Log your mood daily. Spot patterns. Understand what lifts you and what brings you down.</p>
         <a class="feature-link">Learn more →</a>
+      </div>
+      <div class="feature-card" id="authCard" style="text-align:center;background:linear-gradient(135deg, rgba(173,124,213,0.1), rgba(93,202,165,0.1));">
+        <div class="feature-icon" style="background:#EEEDFE;">👤</div>
+        <div class="feature-title">Get Started</div>
+        <p class="feature-desc">Join thousands using AfyaMind for better mental wellness. Create your account today to save your progress.</p>
+        <div style="display:flex;gap:12px;margin-top:16px;justify-content:center;">
+          <button class="btn btn-primary" onclick="window.location.href='login.html'" style="padding:10px 20px;font-size:14px;">Sign In</button>
+          <button class="btn btn-secondary" onclick="window.location.href='signup.html'" style="padding:10px 20px;font-size:14px;">Create Account</button>
+        </div>
       </div>
       <div class="feature-card">
         <div class="feature-icon" style="background:#FEF3E0;">🌱</div>
@@ -186,6 +195,26 @@
 
 <script src="common.js"></script>
 <script>
+  function updateFeatureCards() {
+    const token = localStorage.getItem('afya_token');
+    const moodCard = document.getElementById('moodTrackerCard');
+    const authCard = document.getElementById('authCard');
+
+    console.log('Updating feature cards. Token present:', !!token);
+
+    if (token) {
+      // User is logged in: show Mood Tracker, hide Sign Up
+      if (moodCard) moodCard.style.display = 'grid';
+      if (authCard) authCard.style.display = 'none';
+      console.log('User is logged in - showing Mood Tracker');
+    } else {
+      // User is NOT logged in: hide Mood Tracker, show Sign Up
+      if (moodCard) moodCard.style.display = 'none';
+      if (authCard) authCard.style.display = 'grid';
+      console.log('User is NOT logged in - showing Sign Up card');
+    }
+  }
+
   function navigateToChat() {
     const token = localStorage.getItem('afya_token');
     if (token) {
@@ -195,15 +224,22 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    fetch('header.html').then(r => r.text()).then(html => {
-      document.getElementById('header-container').innerHTML = html;
-      countUp('stat1', 10000, '+');
-      countUp('stat2', 500, '+');
-      countUp('stat3', 3, '');
-      countUp('stat4', 4.9, '/5');
+  // Run on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      updateFeatureCards();
+      fetch('header.html').then(r => r.text()).then(html => {
+        document.getElementById('header-container').innerHTML = html;
+        countUp('stat1', 10000, '+');
+        countUp('stat2', 500, '+');
+        countUp('stat3', 3, '');
+        countUp('stat4', 4.9, '/5');
+      });
     });
-  });
+  } else {
+    // If already loaded, run immediately
+    updateFeatureCards();
+  }
 </script>
 </body>
 </html>

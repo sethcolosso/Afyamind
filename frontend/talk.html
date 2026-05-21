@@ -47,6 +47,9 @@
         <h3>Chat with Afya</h3>
         <div style="font-size:12px;color:var(--text-muted);">AI Wellness Guide · Responds instantly</div>
       </div>
+      <div id="anonNotice" style="margin-left:auto;padding:8px 16px;background:rgba(255,193,7,0.1);border-radius:8px;font-size:12px;color:var(--text-muted);display:none;text-align:right;">
+        <div id="messageCounter" style="font-weight:600;color:#FFC107;">Guest • <span id="messagesLeft">5</span> messages left</div>
+      </div>
     </div>
     <div class="chat-messages" id="chatMessages">
       <div class="msg msg-ai">
@@ -77,6 +80,9 @@
 const API_BASE = 'http://localhost:3001';
 let chatHistory = [];
 let currentLang = 'en';
+let anonMessageCount = 0;
+const MAX_ANON_MESSAGES = 5;
+let isAuthenticated = false;
 
 // ── Auth Utilities ──────────────────────────────────────────
 function getToken() {
@@ -87,8 +93,13 @@ function setToken(token) {
   localStorage.setItem('afya_token', token);
 }
 
-function isAuthenticated() {
-  return !!getToken();
+function checkAuthentication() {
+  isAuthenticated = !!getToken();
+  const anonNotice = document.getElementById('anonNotice');
+  if (anonNotice) {
+    anonNotice.style.display = isAuthenticated ? 'none' : 'block';
+  }
+  return isAuthenticated;
 }
 
 function logout() {
@@ -96,27 +107,25 @@ function logout() {
   window.location.href = 'home.html';
 }
 
-async function apiCall(endpoint, method = 'GET', body = null) {
+async function apiCall(endpoint, method = 'GET', body = null, isAnon = false) {
   const token = getToken();
-  if (!token) {
-    alert('Please login first');
-    window.location.href = 'home.html';
-    return null;
-  }
 
   const options = {
     method,
     headers: {
-      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
   };
+
+  if (token) {
+    options.headers['Authorization'] = `Bearer ${token}`;
+  }
 
   if (body) options.body = JSON.stringify(body);
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, options);
-    if (response.status === 401) {
+    if (response.status === 401 && token) {
       logout();
       return null;
     }
@@ -135,28 +144,25 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('header-container').innerHTML = html;
   });
 
-  if (isAuthenticated()) {
+  checkAuthentication();
+
+  if (isAuthenticated) {
     loadChatHistory();
   } else {
-    showLoginPrompt();
+    initializeAnonChat();
   }
 });
 
-function showLoginPrompt() {
-  const chatPanel = document.querySelector('.chat-panel');
-  if (chatPanel) {
-    chatPanel.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;padding:40px;">
-        <div style="font-size:64px;">🌿</div>
-        <h2 style="text-align:center;">Sign in to chat with Afya</h2>
-        <p style="text-align:center;color:var(--text-sec);max-width:300px;">Create an account or sign in to access your personal wellness chat with Afya.</p>
-        <div style="display:flex;gap:12px;">
-          <button class="btn btn-primary" onclick="window.location.href='login.html'" style="padding:12px 28px;">Sign In</button>
-          <button class="btn btn-secondary" onclick="window.location.href='signup.html'" style="padding:12px 28px;">Create Account</button>
-        </div>
-        <a href="home.html" style="color:var(--text-muted);text-decoration:none;margin-top:12px;">← Back to home</a>
-      </div>
-    `;
+function initializeAnonChat() {
+  anonMessageCount = parseInt(sessionStorage.getItem('anonMessageCount') || '0');
+  updateMessageCounter();
+  const greeting = document.getElementById('chatMessages').querySelector('.msg-ai');
+  if (greeting) {
+    greeting.innerHTML = `<div class="msg-dot">🌿</div>
+      <div>
+        <div class="msg-bubble">Hujambo! I'm Afya, your wellness guide. You are chatting as a guest — your messages won't be saved. Create an account to save your progress. 💚</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Afya · Just now</div>
+      </div>`;
   }
 }
 
@@ -187,6 +193,18 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
 
+  // Check anonymous message limit
+  if (!isAuthenticated) {
+    if (anonMessageCount >= MAX_ANON_MESSAGES) {
+      addMessage('You have reached the 5-message limit as a guest. Please create an account to continue chatting and save your conversations.', 'ai');
+      showLoginPrompt();
+      return;
+    }
+    anonMessageCount++;
+    sessionStorage.setItem('anonMessageCount', anonMessageCount);
+    updateMessageCounter();
+  }
+
   document.getElementById('quickChips').style.display = 'none';
   addMessage(text, 'user');
   input.value = '';
@@ -200,8 +218,9 @@ async function sendMessage() {
 
   showTyping();
 
-  // Call backend API
-  const response = await apiCall('/api/triage', 'POST', {
+  // Use appropriate endpoint based on auth status
+  const endpoint = isAuthenticated ? '/api/triage' : '/api/triage-anon';
+  const response = await apiCall(endpoint, 'POST', {
     messages: [...chatHistory.map(msg => ({
       role: msg.user_message ? 'user' : 'assistant',
       content: msg.user_message || msg.assistant_reply
@@ -215,6 +234,26 @@ async function sendMessage() {
     addMessage(response.reply, 'ai');
     if (response.isCrisis) openCrisis();
   }
+}
+
+function updateMessageCounter() {
+  const messagesLeft = MAX_ANON_MESSAGES - anonMessageCount;
+  const counter = document.getElementById('messagesLeft');
+  if (counter) {
+    counter.textContent = messagesLeft;
+  }
+  if (messagesLeft === 0) {
+    document.getElementById('messageCounter').style.color = '#FF6B6B';
+  }
+}
+
+function showLoginPrompt() {
+  const chips = document.getElementById('quickChips');
+  const input = document.getElementById('chatInput');
+  const send = document.querySelector('.chat-send');
+  if (chips) chips.style.display = 'none';
+  if (input) input.disabled = true;
+  if (send) send.disabled = true;
 }
 
 function addMessage(text, sender) {

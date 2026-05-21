@@ -232,6 +232,7 @@ app.get("/", (req, res) => {
       },
       chat: {
         triage: "POST /api/triage (requires auth)",
+        triageAnon: "POST /api/triage-anon (anonymous, no persistence)",
         history: "GET /api/chat/history (requires auth)",
       },
       mood: {
@@ -320,6 +321,99 @@ app.post("/api/triage", verifyToken, aiLimiter, async (req, res) => {
       language,
       is_crisis: isCrisis,
     });
+
+    res.json({
+      reply: replyText,
+      isCrisis,
+      usage: {
+        inputTokens: response.response.usageMetadata?.promptTokenCount || 0,
+        outputTokens: response.response.usageMetadata?.candidatesTokenCount || 0,
+      },
+    });
+  } catch (error) {
+    console.error("Triage API error:", error.message);
+
+    if (error.message?.includes("API key")) {
+      return res
+        .status(500)
+        .json({ error: "API key invalid. Check your GEMINI_API_KEY in .env" });
+    }
+    if (error.message?.includes("429")) {
+      return res
+        .status(429)
+        .json({ error: "API rate limit reached. Please wait a moment." });
+    }
+
+    res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+});
+
+/**
+ * POST /api/triage-anon
+ * Afya AI chat for anonymous users (no auth required, no persistence)
+ *
+ * Body: {
+ *   messages: [{ role: "user"|"assistant", content: string }],
+ *   language?: "en" | "sw"
+ * }
+ */
+app.post("/api/triage-anon", aiLimiter, async (req, res) => {
+  try {
+    const { messages, language = "en" } = req.body;
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages array is required" });
+    }
+
+    // Validate message structure
+    const validMessages = messages
+      .filter(
+        (m) =>
+          m &&
+          typeof m === "object" &&
+          ["user", "assistant"].includes(m.role) &&
+          typeof m.content === "string" &&
+          m.content.trim().length > 0
+      )
+      .slice(-20);
+
+    if (validMessages.length === 0) {
+      return res.status(400).json({ error: "No valid messages provided" });
+    }
+
+    const userMessage = validMessages[validMessages.length - 1];
+
+    // Add language hint to system prompt
+    const systemPrompt =
+      AFYA_SYSTEM_PROMPT +
+      (language === "sw"
+        ? "\n\nIMPORTANT: The user has selected Swahili. Please respond primarily in Swahili."
+        : "");
+
+    // Convert messages to Gemini format
+    const contents = validMessages.map((m) => ({
+      role: m.role === "user" ? "user" : "model",
+      parts: [{ text: m.content }],
+    }));
+
+    // Call Gemini API
+    const response = await model.generateContent({
+      contents,
+      systemInstruction: systemPrompt,
+      generationConfig: {
+        maxOutputTokens: 600,
+        temperature: 0.7,
+      },
+    });
+
+    const replyText = response.response.text() || "";
+    const isCrisis =
+      /befrienders|crisis line|1199|\+254 722|call now|immediate danger|emergency/i.test(
+        replyText
+      );
+
+    // NOTE: Anonymous messages are NOT saved to database
+    // Only authenticated users' conversations are persisted
 
     res.json({
       reply: replyText,

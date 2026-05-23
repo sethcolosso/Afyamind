@@ -23,14 +23,14 @@
     <i style="color:red;"><b>SOON COMING</b> </i>To Uganda &amp; Tanzania
     </div>
       <h1>Your mental health matters.<br><span class="purple">Find support, your way.</span></h1>
-      <p class="hero-sub">Connect with therapists, track your mood, and access mental wellness resources — all in Swahili and English, built for East Africa.</p>
+      <p class="hero-sub">Connect with therapists, track your mood, and access mental wellness resources.</p>
       <div class="hero-btns">
         <button class="btn btn-primary btn-lg" onclick="navigateToChat()">Get Help Now</button>
         <button class="btn btn-secondary btn-lg" onclick="window.location.href='help.html'">Find a Therapist</button>
       </div>
       <div class="hero-stats">
-        <div class="hero-stat"><strong>100+</strong><span>Users</span></div>
-        <div class="hero-stat"><strong>5+</strong><span>Providers</span></div>
+        <div class="hero-stat"><strong>50+</strong><span>Users</span></div>
+        <div class="hero-stat"><strong>1+</strong><span>Providers</span></div>
         <div class="hero-stat"><strong>24/7</strong><span>Available</span></div>
       </div>
     </div>
@@ -39,7 +39,7 @@
         <div class="float-card-label" style="color:#d6bcfa; background:#2a1b3d; padding:8px 14px; border-radius:12px; font-weight:600;">
           Today's Check-In
         </div>
-        <div style="font-size:14px;color:var(--text-sec);" >Hello how are you feeling today?</div>
+        <div style="font-size:14px;color:#f0eef3;" >Hello how are you feeling today?</div>
         <div class="mood-selector">
           <span class="mood-emoji" onclick="selectMood(this)">😔</span>
           <span class="mood-emoji" onclick="selectMood(this)">😟</span>
@@ -49,7 +49,7 @@
         </div>
       </div>
       <div class="float-card" style="color:#7343bb; background:#b6a3cf; padding:8px 14px; border-radius:12px; font-weight:6000;">
-        <div class="float-card-label">Recommended for you</div>
+        <div class="float-card-label" style="color:#f0eef3;" >Recommended for you</div>
         <div class="provider-card-mini">
           <div class="provider-avatar-sm">AH</div>
           <div>
@@ -74,27 +74,31 @@
 <div class="crisis-banner">
   In crisis right now? You are not alone. <a onclick="openCrisis()">Get immediate help →</a>
 </div>
-
 <!-- HOW IT WORKS -->
-<section>
+<section id="how-it-works">
   <div class="container">
-    <div style="text-align:center;"><div class="section-badge">How it works</div></div>
+    <div style="text-align:center;">
+      <div class="section-badge">How it works</div>
+    </div>
     <h2 class="section-heading">How AfyaMind works</h2>
     <p class="section-sub">Three simple steps to start your wellness journey today.</p>
-    <div class="steps-grid">
-      <div class="step-card">
+    
+    <div class="steps-grid" id="steps-grid">
+      <div class="step-card" data-step="1">
         <div class="step-number">1</div>
         <div class="step-icon">💬</div>
         <div class="step-title">Tell us how you feel</div>
         <p class="step-body">Chat with our AI assistant Afya — in Swahili or English — and get guided to exactly the right support for your situation.</p>
       </div>
-      <div class="step-card">
+      
+      <div class="step-card" data-step="2">
         <div class="step-number">2</div>
         <div class="step-icon">📍</div>
         <div class="step-title">Find your match</div>
         <p class="step-body">Browse verified therapists, counsellors, and coaches near you or available online. Filter by language, speciality, and price.</p>
       </div>
-      <div class="step-card">
+      
+      <div class="step-card" data-step="3">
         <div class="step-number">3</div>
         <div class="step-icon">💓</div>
         <div class="step-title">Start your journey</div>
@@ -103,7 +107,6 @@
     </div>
   </div>
 </section>
-
 <!-- FEATURES -->
 <section class="features-bg">
   <div class="container">
@@ -243,6 +246,48 @@
     // If already loaded, run immediately
     updateFeatureCards();
   }
+</script>
+<script>
+// Improved animation that re-triggers when scrolling back
+function animateSteps() {
+  const cards = document.querySelectorAll('.step-card');
+  const grid = document.getElementById('steps-grid');
+
+  if (!grid) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        // Reset cards first
+        cards.forEach(card => {
+          card.classList.remove('animate');
+        });
+
+        // Then animate them one by one
+        cards.forEach((card, index) => {
+          setTimeout(() => {
+            card.classList.add('animate');
+          }, index * 250); // Slightly faster delay
+        });
+      }
+    });
+  }, {
+    threshold: 0.25,           // Trigger when 25% of section is visible
+    rootMargin: "-50px 0px -50px 0px"
+  });
+
+  observer.observe(grid);
+}
+
+// Run when page loads
+window.addEventListener('load', animateSteps);
+
+// Also trigger if user refreshes or returns to the page
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    animateSteps();
+  }
+});
 </script>
 </body>
 </html>

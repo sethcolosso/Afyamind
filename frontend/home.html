@@ -78,6 +78,7 @@
 <section id="how-it-works" style="padding: 100px 0; background: #f8fafc;">
   <div class="container">
     <div style="text-align:center; margin-bottom: 4rem;">
+      <div class="section-badge">How it works</div>
       <h2 class="section-heading" style="font-size: 2.5rem; margin: 1rem 0;">How AfyaMind works</h2>
       <p class="section-sub" style="max-width: 600px; margin: 0 auto; font-size: 1.1rem; color: #64748b;">
         Three simple steps to start your wellness journey today.
@@ -281,57 +282,65 @@
   }
 </script>
 <script>
-// Animate SVG cartoon + cards
+// Synchronized SVG Cartoon + Cards Animation
 function animateAll() {
   const svg = document.getElementById('steps-svg');
+  const cards = document.querySelectorAll('.step-card');
+
   if (!svg) return;
 
-  // Reset
+  // Reset everything
   svg.querySelectorAll('g').forEach(g => g.style.opacity = '0.3');
-  document.querySelectorAll('path').forEach(path => {
-    path.style.strokeDashoffset = '100';
-  });
+  document.querySelectorAll('path').forEach(path => path.style.strokeDashoffset = '100');
+  cards.forEach(card => card.classList.remove('animate'));
 
-  // Animate SVG steps sequentially
+  // === SYNCHRONIZED TIMELINE ===
+
+  // Step 1: SVG + Card 1
   setTimeout(() => {
-    document.getElementById('step1').style.transition = 'opacity 0.6s';
+    document.getElementById('step1').style.transition = 'opacity 0.6s ease';
     document.getElementById('step1').style.opacity = '1';
-  }, 300);
+    cards[0].classList.add('animate');
+  }, 400);
 
+  // Arrow 1
   setTimeout(() => {
     document.getElementById('arrow1').style.transition = 'stroke-dashoffset 0.8s ease';
     document.getElementById('arrow1').style.strokeDashoffset = '0';
-  }, 800);
+  }, 1100);
 
+  // Step 2: SVG + Card 2
   setTimeout(() => {
-    document.getElementById('step2').style.transition = 'opacity 0.6s';
+    document.getElementById('step2').style.transition = 'opacity 0.6s ease';
     document.getElementById('step2').style.opacity = '1';
-  }, 1400);
+    cards[1].classList.add('animate');
+  }, 1900);
 
+  // Arrow 2
   setTimeout(() => {
     document.getElementById('arrow2').style.transition = 'stroke-dashoffset 0.8s ease';
     document.getElementById('arrow2').style.strokeDashoffset = '0';
-  }, 1900);
+  }, 2600);
 
+  // Step 3: SVG + Card 3
   setTimeout(() => {
-    document.getElementById('step3').style.transition = 'opacity 0.6s';
+    document.getElementById('step3').style.transition = 'opacity 0.6s ease';
     document.getElementById('step3').style.opacity = '1';
-  }, 2500);
-
-  // Trigger card animation
-  const cards = document.querySelectorAll('.step-card');
-  cards.forEach((card, i) => {
-    setTimeout(() => card.classList.add('animate'), 2800 + i * 400);
-  });
+    cards[2].classList.add('animate');
+  }, 3400);
 }
 
+// Intersection Observer - Triggers when section comes into view
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
       animateAll();
     }
   });
-}, { threshold: 0.3 });
+}, { 
+  threshold: 0.25,
+  rootMargin: "-80px 0px -100px 0px"
+});
 
 observer.observe(document.getElementById('how-it-works'));
 </script>

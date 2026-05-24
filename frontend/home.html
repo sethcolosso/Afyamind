@@ -75,14 +75,48 @@
   In crisis right now? You are not alone. <a onclick="openCrisis()">Get immediate help →</a>
 </div>
 <!-- HOW IT WORKS -->
-<section id="how-it-works">
+<section id="how-it-works" style="padding: 100px 0; background: #f8fafc;">
   <div class="container">
-    <div style="text-align:center;">
+    <div style="text-align:center; margin-bottom: 4rem;">
       <div class="section-badge">How it works</div>
+      <h2 class="section-heading" style="font-size: 2.5rem; margin: 1rem 0;">How AfyaMind works</h2>
+      <p class="section-sub" style="max-width: 600px; margin: 0 auto; font-size: 1.1rem; color: #64748b;">
+        Three simple steps to start your wellness journey today.
+      </p>
     </div>
-    <h2 class="section-heading">How AfyaMind works</h2>
-    <p class="section-sub">Three simple steps to start your wellness journey today.</p>
-    
+
+    <!-- Cartoon Animation -->
+    <div class="cartoon-animation" style="text-align:center; margin-bottom: 4rem;">
+      <svg width="800" height="180" viewBox="0 0 800 180" fill="none" xmlns="http://www.w3.org/2000/svg" id="steps-svg">
+        <!-- Step 1 -->
+        <g id="step1">
+          <circle cx="150" cy="90" r="45" fill="#10b981"/>
+          <text x="150" y="98" font-size="48" text-anchor="middle" fill="white">💬</text>
+          <text x="150" y="155" font-size="18" text-anchor="middle" fill="#1e2937" font-weight="600">Tell us how you feel</text>
+        </g>
+
+        <!-- Arrow 1 -->
+        <path id="arrow1" d="M220 90 Q280 70 300 90" stroke="#34d399" stroke-width="8" stroke-linecap="round" fill="none" stroke-dasharray="20 10"/>
+        
+        <!-- Step 2 -->
+        <g id="step2">
+          <circle cx="400" cy="90" r="45" fill="#10b981"/>
+          <text x="400" y="98" font-size="48" text-anchor="middle" fill="white">📍</text>
+          <text x="400" y="155" font-size="18" text-anchor="middle" fill="#1e2937" font-weight="600">Find your match</text>
+        </g>
+
+        <!-- Arrow 2 -->
+        <path id="arrow2" d="M470 90 Q530 70 550 90" stroke="#34d399" stroke-width="8" stroke-linecap="round" fill="none" stroke-dasharray="20 10"/>
+        
+        <!-- Step 3 -->
+        <g id="step3">
+          <circle cx="650" cy="90" r="45" fill="#10b981"/>
+          <text x="650" y="98" font-size="48" text-anchor="middle" fill="white">💓</text>
+          <text x="650" y="155" font-size="18" text-anchor="middle" fill="#1e2937" font-weight="600">Start your journey</text>
+        </g>
+      </svg>
+    </div>
+
     <div class="steps-grid" id="steps-grid">
       <div class="step-card" data-step="1">
         <div class="step-number">1</div>
@@ -90,14 +124,14 @@
         <div class="step-title">Tell us how you feel</div>
         <p class="step-body">Chat with our AI assistant Afya — in Swahili or English — and get guided to exactly the right support for your situation.</p>
       </div>
-      
+
       <div class="step-card" data-step="2">
         <div class="step-number">2</div>
         <div class="step-icon">📍</div>
         <div class="step-title">Find your match</div>
         <p class="step-body">Browse verified therapists, counsellors, and coaches near you or available online. Filter by language, speciality, and price.</p>
       </div>
-      
+
       <div class="step-card" data-step="3">
         <div class="step-number">3</div>
         <div class="step-icon">💓</div>
@@ -248,46 +282,59 @@
   }
 </script>
 <script>
-// Improved animation that re-triggers when scrolling back
-function animateSteps() {
-  const cards = document.querySelectorAll('.step-card');
-  const grid = document.getElementById('steps-grid');
+// Animate SVG cartoon + cards
+function animateAll() {
+  const svg = document.getElementById('steps-svg');
+  if (!svg) return;
 
-  if (!grid) return;
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        // Reset cards first
-        cards.forEach(card => {
-          card.classList.remove('animate');
-        });
-
-        // Then animate them one by one
-        cards.forEach((card, index) => {
-          setTimeout(() => {
-            card.classList.add('animate');
-          }, index * 250); // Slightly faster delay
-        });
-      }
-    });
-  }, {
-    threshold: 0.25,           // Trigger when 25% of section is visible
-    rootMargin: "-50px 0px -50px 0px"
+  // Reset
+  svg.querySelectorAll('g').forEach(g => g.style.opacity = '0.3');
+  document.querySelectorAll('path').forEach(path => {
+    path.style.strokeDashoffset = '100';
   });
 
-  observer.observe(grid);
+  // Animate SVG steps sequentially
+  setTimeout(() => {
+    document.getElementById('step1').style.transition = 'opacity 0.6s';
+    document.getElementById('step1').style.opacity = '1';
+  }, 300);
+
+  setTimeout(() => {
+    document.getElementById('arrow1').style.transition = 'stroke-dashoffset 0.8s ease';
+    document.getElementById('arrow1').style.strokeDashoffset = '0';
+  }, 800);
+
+  setTimeout(() => {
+    document.getElementById('step2').style.transition = 'opacity 0.6s';
+    document.getElementById('step2').style.opacity = '1';
+  }, 1400);
+
+  setTimeout(() => {
+    document.getElementById('arrow2').style.transition = 'stroke-dashoffset 0.8s ease';
+    document.getElementById('arrow2').style.strokeDashoffset = '0';
+  }, 1900);
+
+  setTimeout(() => {
+    document.getElementById('step3').style.transition = 'opacity 0.6s';
+    document.getElementById('step3').style.opacity = '1';
+  }, 2500);
+
+  // Trigger card animation
+  const cards = document.querySelectorAll('.step-card');
+  cards.forEach((card, i) => {
+    setTimeout(() => card.classList.add('animate'), 2800 + i * 400);
+  });
 }
 
-// Run when page loads
-window.addEventListener('load', animateSteps);
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      animateAll();
+    }
+  });
+}, { threshold: 0.3 });
 
-// Also trigger if user refreshes or returns to the page
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    animateSteps();
-  }
-});
+observer.observe(document.getElementById('how-it-works'));
 </script>
 </body>
 </html>

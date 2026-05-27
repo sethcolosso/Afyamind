@@ -247,4 +247,33 @@ window.addEventListener('load', () => {
 
 // Note: talk.html has its own sendMessage implementation with proper auth
 // This common.js file is only for non-authenticated pages (home.html, help.html, etc)
+// common.js - Shared functions for all pages
 
+function updateAuthUI() {
+  const token = localStorage.getItem('afya_token');
+  
+  const loggedInDiv = document.getElementById('nav-logged-in');
+  const loggedOutDiv = document.getElementById('nav-logged-out');
+
+  if (loggedInDiv && loggedOutDiv) {
+    if (token) {
+      loggedInDiv.style.display = 'flex';
+      loggedOutDiv.style.display = 'none';
+    } else {
+      loggedInDiv.style.display = 'none';
+      loggedOutDiv.style.display = 'flex';
+    }
+  }
+}
+
+function logout() {
+  localStorage.removeItem('afya_token');
+  localStorage.removeItem('afya_user');
+  window.location.href = 'home.html';
+}
+
+// Run auth update automatically when header is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  // Small delay to let header load
+  setTimeout(updateAuthUI, 400);
+});

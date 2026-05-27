@@ -24,15 +24,6 @@
   font-size: 24px;
 }
 
-.dot {
-  width: 10px;
-  height: 10px;
-  background: rgba(255,255,255,0.6);
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
 .dot.active {
   background: white;
   transform: scale(1.3);

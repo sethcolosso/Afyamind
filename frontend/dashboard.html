@@ -38,21 +38,22 @@
   </div>
 
   <div class="dashboard-main">
-    <!-- Overview Panel -->
+    <!-- OVERVIEW PANEL -->
     <div id="overview-panel" class="dash-full">
       <div class="welcome-bar">
         <h2 id="welcome-message">Good morning, User ☀️</h2>
         <p>How are you feeling today?</p>
       </div>
+      
       <div class="dash-cards">
         <div class="dash-card">
           <div class="dash-card-label">Mood Streak</div>
-          <div class="dash-card-value">7 days 🔥</div>
+          <div class="dash-card-value" id="streak-value">7 days 🔥</div>
           <div class="dash-card-sub">Keep it going!</div>
         </div>
         <div class="dash-card">
           <div class="dash-card-label">Next Session</div>
-          <div class="dash-card-value" style="font-size:16px;">Dr. Amina</div>
+          <div class="dash-card-value" style="font-size:16px;">Dr. Amina Hassan</div>
           <div class="dash-card-sub" style="color:var(--primary);font-weight:600;">Tomorrow 10:00 AM</div>
         </div>
         <div class="dash-card">
@@ -61,9 +62,46 @@
           <div class="dash-card-sub">Managing Anxiety · Week 4</div>
         </div>
       </div>
+
+      <!-- Today's Mood Check-In -->
+      <div class="dash-widget">
+        <h3>Today's Mood Check-In</h3>
+        <p style="font-size:14px;color:var(--text-sec);margin-bottom:12px;">How are you feeling right now?</p>
+        <div class="mood-check" id="mood-check">
+          <button class="mood-btn" data-mood="😔" onclick="logMood(this)">😔</button>
+          <button class="mood-btn" data-mood="😟" onclick="logMood(this)">😟</button>
+          <button class="mood-btn" data-mood="😐" onclick="logMood(this)">😐</button>
+          <button class="mood-btn" data-mood="🙂" onclick="logMood(this)">🙂</button>
+          <button class="mood-btn" data-mood="😊" onclick="logMood(this)">😊</button>
+        </div>
+       <textarea id="mood-note" class="search-input" 
+          placeholder="Write a note about how you're feeling today... (optional)" 
+          rows="2" style="margin:15px 0; resize: vertical;"></textarea>
+        <button class="btn btn-primary" onclick="saveMoodEntry()">Log Mood</button>
+      </div>
     </div>
 
-    <!-- Settings Panel -->
+    <!-- MOOD TRACKER PANEL -->
+    <div id="mood-tracker-panel" class="dash-full" style="display:none;">
+      <h2>Mood Tracker</h2>
+      <div class="mood-history">
+        <h3>Recent Moods</h3>
+        <table id="mood-table" style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Mood</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody id="mood-table-body">
+            <!-- Filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS PANEL -->
     <div id="settings-panel" class="dash-full" style="display: none;">
       <h2>Account Settings</h2>
       <div class="settings-form">
@@ -71,18 +109,15 @@
           <label>Full Name</label>
           <input type="text" id="settings-name" placeholder="Your full name">
         </div>
-        
         <div class="form-group">
           <label>Email Address</label>
           <input type="email" id="settings-email" placeholder="you@example.com">
         </div>
-        
         <div class="form-group">
           <label>New Password (leave blank if not changing)</label>
           <input type="password" id="settings-password" placeholder="••••••••">
         </div>
-
-        <button onclick="saveSettings()" class="btn btn-primary" style="margin-top:20px; padding:12px 32px;">Save Changes</button>
+        <button onclick="saveSettings()" class="btn btn-primary">Save Changes</button>
       </div>
     </div>
   </div>
@@ -90,11 +125,12 @@
 
 <script src="common.js"></script>
 <script>
+let moods = JSON.parse(localStorage.getItem('userMoods')) || [];
+
 function checkAuth() {
   const token = localStorage.getItem('afya_token');
   const userData = localStorage.getItem('afya_user');
   if (!token || !userData) {
-    alert('Please login to access the dashboard');
     window.location.href = 'login.html';
     return null;
   }
@@ -103,66 +139,99 @@ function checkAuth() {
 
 function loadUserData(user) {
   const name = user.name || user.email?.split('@')[0] || "User";
-  
   document.getElementById('user-fullname').textContent = name;
   document.getElementById('user-avatar').textContent = name.substring(0, 2).toUpperCase();
   document.getElementById('welcome-message').textContent = `Good morning, ${name} ☀️`;
 
-  // Fill settings
   document.getElementById('settings-name').value = user.name || '';
   document.getElementById('settings-email').value = user.email || '';
 }
 
 function switchTab(tabIndex) {
-  // Hide all panels
-  document.getElementById('overview-panel').style.display = 'none';
-  document.getElementById('settings-panel').style.display = 'none';
-
-  // Show selected panel
-  if (tabIndex === 8) {
+  document.querySelectorAll('.dash-full').forEach(panel => panel.style.display = 'none');
+  
+  if (tabIndex === 1) {
+    document.getElementById('mood-tracker-panel').style.display = 'block';
+    renderMoodTable();
+  } else if (tabIndex === 8) {
     document.getElementById('settings-panel').style.display = 'block';
   } else {
     document.getElementById('overview-panel').style.display = 'block';
   }
 
-  // Update active class
   document.querySelectorAll('.sidebar-link').forEach(link => link.classList.remove('active'));
-  if (tabIndex === 8) {
-    document.getElementById('settings-link').classList.add('active');
-  } else {
-    document.querySelector('.sidebar-link').classList.add('active');
+  document.querySelectorAll('.sidebar-link')[tabIndex].classList.add('active');
+}
+
+function logMood(btn) {
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function saveMoodEntry() {
+  const selected = document.querySelector('.mood-btn.selected');
+  if (!selected) {
+    alert("Please select a mood");
+    return;
   }
+
+  const mood = selected.dataset.mood;
+  const note = document.getElementById('mood-note').value.trim();
+
+  const entry = {
+    date: new Date().toLocaleDateString('en-GB'),
+    mood: mood,
+    note: note || "No note"
+  };
+
+  moods.unshift(entry);
+  localStorage.setItem('userMoods', JSON.stringify(moods));
+
+  alert("✅ Mood logged successfully!");
+  document.getElementById('mood-note').value = '';
+  renderMoodTable();
+}
+
+function renderMoodTable() {
+  const tbody = document.getElementById('mood-table-body');
+  tbody.innerHTML = '';
+
+  moods.forEach(entry => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${entry.date}</td>
+      <td style="font-size:24px;">${entry.mood}</td>
+      <td>${entry.note}</td>
+    `;
+    tbody.appendChild(row);
+  });
 }
 
 function saveSettings() {
   const name = document.getElementById('settings-name').value.trim();
   const email = document.getElementById('settings-email').value.trim();
-  const password = document.getElementById('settings-password').value.trim();
 
   let user = JSON.parse(localStorage.getItem('afya_user') || '{}');
-
   if (name) user.name = name;
   if (email) user.email = email;
 
   localStorage.setItem('afya_user', JSON.stringify(user));
-
-  alert('✅ Settings saved successfully!');
+  alert('✅ Settings saved!');
   loadUserData(user);
 }
 
-// Initialize Dashboard
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
   const user = checkAuth();
   if (!user) return;
 
-  fetch('header.html')
-    .then(r => r.text())
-    .then(html => {
-      document.getElementById('header-container').innerHTML = html;
-    });
+  fetch('header.html').then(r => r.text()).then(html => {
+    document.getElementById('header-container').innerHTML = html;
+  });
 
   loadUserData(user);
-  switchTab(0); // Start with Overview
+  switchTab(0);
+  renderMoodTable();
 });
 </script>
 </body>

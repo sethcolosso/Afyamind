@@ -232,7 +232,6 @@
   </div>
   <div style="height:20px;"></div>
 </footer>
-
 <script src="common.js"></script>
 <script>
   function updateFeatureCards() {
@@ -243,15 +242,11 @@
     console.log('Updating feature cards. Token present:', !!token);
 
     if (token) {
-      // User is logged in: show Mood Tracker, hide Sign Up
       if (moodCard) moodCard.style.display = 'grid';
       if (authCard) authCard.style.display = 'none';
-      console.log('User is logged in - showing Mood Tracker');
     } else {
-      // User is NOT logged in: hide Mood Tracker, show Sign Up
       if (moodCard) moodCard.style.display = 'none';
       if (authCard) authCard.style.display = 'grid';
-      console.log('User is NOT logged in - showing Sign Up card');
     }
   }
 
@@ -264,20 +259,56 @@
     }
   }
 
-  // Run on page load
+  // ==================== AUTH UI UPDATE ====================
+  function updateAuthUI() {
+    const token = localStorage.getItem('afya_token');
+    
+    const loggedInDiv = document.getElementById('nav-logged-in');
+    const loggedOutDiv = document.getElementById('nav-logged-out');
+
+    console.log('updateAuthUI running. Token present:', !!token);
+
+    if (loggedInDiv && loggedOutDiv) {
+      if (token) {
+        loggedInDiv.style.display = 'flex';
+        loggedOutDiv.style.display = 'none';
+        console.log('✅ Showing Dashboard + Logout');
+      } else {
+        loggedInDiv.style.display = 'none';
+        loggedOutDiv.style.display = 'flex';
+        console.log('✅ Showing Login + Sign Up');
+      }
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('afya_token');
+    localStorage.removeItem('afya_user');
+    window.location.href = 'home.html';
+  }
+
+  // ==================== MAIN LOAD ====================
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       updateFeatureCards();
-      fetch('header.html').then(r => r.text()).then(html => {
-        document.getElementById('header-container').innerHTML = html;
-        countUp('stat1', 10000, '+');
-        countUp('stat2', 500, '+');
-        countUp('stat3', 3, '');
-        countUp('stat4', 4.9, '/5');
-      });
+      
+      fetch('header.html')
+        .then(r => r.text())
+        .then(html => {
+          document.getElementById('header-container').innerHTML = html;
+          
+          // Run these after header loads
+          setTimeout(() => {
+            updateAuthUI();
+            countUp('stat1', 10000, '+');
+            countUp('stat2', 500, '+');
+            countUp('stat3', 3, '');
+            countUp('stat4', 4.9, '/5');
+          }, 300);
+        })
+        .catch(err => console.error('Header failed to load:', err));
     });
   } else {
-    // If already loaded, run immediately
     updateFeatureCards();
   }
 </script>

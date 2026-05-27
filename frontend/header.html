@@ -21,14 +21,14 @@
     </div>
     <button class="btn btn-coral" onclick="window.location.href='talk.html'" style="font-size:14px;padding:9px 18px;">Get Help Now</button>
 
-    <!-- Logged in: Show Dashboard and Logout -->
-    <div id="nav-logged-in" style="display:none;gap:12px;flex-direction:row;">
-      <button class="btn btn-secondary" onclick="window.location.href='dashboard.html'" style="font-size:14px;padding:9px 18px;" id="nav-dashboard">Dashboard</button>
+    <!-- Logged in -->
+    <div id="nav-logged-in" style="display:none; gap:12px; flex-direction:row; align-items:center;">
+      <button class="btn btn-secondary" onclick="window.location.href='dashboard.html'" style="font-size:14px;padding:9px 18px;">Dashboard</button>
       <button class="btn btn-secondary" onclick="logout()" style="font-size:14px;padding:9px 18px;">Logout</button>
     </div>
 
-    <!-- Not logged in: Show Login and Sign Up -->
-    <div id="nav-logged-out" style="display:flex;gap:12px;flex-direction:row;">
+    <!-- Not logged in -->
+    <div id="nav-logged-out" style="display:flex; gap:12px; flex-direction:row; align-items:center;">
       <button class="btn btn-secondary" onclick="window.location.href='login.html'" style="font-size:14px;padding:9px 18px;">Login</button>
       <button class="btn btn-primary" onclick="window.location.href='signup.html'" style="font-size:14px;padding:9px 18px;">Sign Up</button>
     </div>
@@ -37,26 +37,27 @@
   <script>
     function updateNavAuth() {
       const token = localStorage.getItem('afya_token');
-      const authDiv = document.getElementById('nav-auth');
-      const unauthDiv = document.getElementById('nav-unauth');
+      
+      const loggedInDiv = document.getElementById('nav-logged-in');
+      const loggedOutDiv = document.getElementById('nav-logged-out');
 
-      console.log('Header: Checking auth. Token present:', !!token);
+      console.log('Header: Token present =', !!token);
 
       if (token) {
-        if (authDiv) authDiv.style.display = 'flex';
-        if (unauthDiv) unauthDiv.style.display = 'none';
-        console.log('Header: Showing Dashboard buttons');
+        if (loggedInDiv) loggedInDiv.style.display = 'flex';
+        if (loggedOutDiv) loggedOutDiv.style.display = 'none';
+        console.log('✅ Showing Dashboard + Logout');
       } else {
-        if (authDiv) authDiv.style.display = 'none';
-        if (unauthDiv) unauthDiv.style.display = 'flex';
-        console.log('Header: Showing Login/Sign Up buttons');
+        if (loggedInDiv) loggedInDiv.style.display = 'none';
+        if (loggedOutDiv) loggedOutDiv.style.display = 'flex';
+        console.log('✅ Showing Login + Sign Up');
       }
     }
 
-    // Run immediately
-    updateNavAuth();
-
-    // Also run when page becomes visible again (in case user switches tabs)
+    // Run when header loads
+    document.addEventListener('DOMContentLoaded', updateNavAuth);
+    
+    // Also update when user comes back to tab
     document.addEventListener('visibilitychange', updateNavAuth);
   </script>
 </nav>

@@ -181,7 +181,7 @@ async function handleLogin(event) {
     successMsg.textContent = '✓ Login successful! Redirecting...';
     successMsg.style.display = 'block';
 
-    setTimeout(() => window.location.href = 'talk.html', 1500);
+    setTimeout(() => window.location.href = 'home.html', 1200);
   } catch (error) {
     errorMsg.textContent = '✗ ' + error.message;
     errorMsg.style.display = 'block';

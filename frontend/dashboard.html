@@ -16,72 +16,73 @@
 <div class="dashboard-layout">
   <div class="sidebar">
     <div class="sidebar-user">
-      <div class="sidebar-avatar">WK</div>
+      <div class="sidebar-avatar" id="user-avatar">👤</div>
       <div>
-        <div class="sidebar-name">Wanjiru K.</div>
-        <div class="sidebar-role">Member since 2026</div>
+        <div class="sidebar-name" id="user-fullname">Loading...</div>
+        <div class="sidebar-role" id="user-role">Member since 2026</div>
       </div>
     </div>
     <div class="sidebar-nav">
-      <div class="sidebar-link active">🏠 <span>Overview</span></div>
-      <div class="sidebar-link">📊 <span>Mood Tracker</span></div>
-      <div class="sidebar-link">📓 <span>My Journal</span></div>
-      <div class="sidebar-link">📅 <span>My Sessions</span></div>
-      <div class="sidebar-link">🧘 <span>Exercises</span></div>
-      <div class="sidebar-link">📚 <span>My Courses</span></div>
-      <div class="sidebar-link">🤝 <span>Community</span></div>
-      <div class="sidebar-link">🌱 <span>Addiction Support</span></div>
-      <div class="sidebar-link">📰 <span>Resources</span></div>
-      <div class="sidebar-link">⚙️ <span>Settings</span></div>
+      <div class="sidebar-link active" onclick="switchTab(0)">🏠 <span>Overview</span></div>
+      <div class="sidebar-link" onclick="switchTab(1)">📊 <span>Mood Tracker</span></div>
+      <div class="sidebar-link" onclick="switchTab(2)">📓 <span>My Journal</span></div>
+      <div class="sidebar-link" onclick="switchTab(3)">📅 <span>My Sessions</span></div>
+      <div class="sidebar-link" onclick="switchTab(4)">🧘 <span>Exercises</span></div>
+      <div class="sidebar-link" onclick="switchTab(5)">📚 <span>My Courses</span></div>
+      <div class="sidebar-link" onclick="switchTab(6)">🤝 <span>Community</span></div>
+      <div class="sidebar-link" onclick="switchTab(7)">🌱 <span>Addiction Support</span></div>
+      <div class="sidebar-link" id="settings-link" onclick="switchTab(8)">⚙️ <span>Settings</span></div>
       <div class="divider"></div>
       <div class="sidebar-link sos" onclick="openCrisis()">🆘 <span>SOS / Crisis</span></div>
     </div>
   </div>
+
   <div class="dashboard-main">
-    <div class="welcome-bar">
-      <h2>Good morning, Wanjiru ☀️</h2>
-      <p>How are you feeling today? <em style="color:var(--primary);">Tip: Gratitude journaling has been linked to improved mood and sleep.</em></p>
-    </div>
-    <div class="dash-cards">
-      <div class="dash-card">
-        <div class="dash-card-label">Mood Streak</div>
-        <div class="dash-card-value">7 days 🔥</div>
-        <div class="dash-card-sub">Keep it going!</div>
+    <!-- Overview Panel -->
+    <div id="overview-panel" class="dash-full">
+      <div class="welcome-bar">
+        <h2 id="welcome-message">Good morning, User ☀️</h2>
+        <p>How are you feeling today?</p>
       </div>
-      <div class="dash-card">
-        <div class="dash-card-label">Next Session</div>
-        <div class="dash-card-value" style="font-size:16px;">Dr. Amina</div>
-        <div class="dash-card-sub" style="color:var(--primary);font-weight:600;">Tomorrow 10:00 AM</div>
-      </div>
-      <div class="dash-card">
-        <div class="dash-card-label">Course Progress</div>
-        <div class="dash-card-value" style="font-size:16px;">60%</div>
-        <div class="dash-card-sub">Managing Anxiety · Week 4</div>
-      </div>
-      <div class="dash-card">
-        <div class="dash-card-label">Community</div>
-        <div class="dash-card-value" style="font-size:16px;">3 new 💬</div>
-        <div class="dash-card-sub">Anxiety Support Group</div>
+      <div class="dash-cards">
+        <div class="dash-card">
+          <div class="dash-card-label">Mood Streak</div>
+          <div class="dash-card-value">7 days 🔥</div>
+          <div class="dash-card-sub">Keep it going!</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-label">Next Session</div>
+          <div class="dash-card-value" style="font-size:16px;">Dr. Amina</div>
+          <div class="dash-card-sub" style="color:var(--primary);font-weight:600;">Tomorrow 10:00 AM</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-label">Course Progress</div>
+          <div class="dash-card-value" style="font-size:16px;">60%</div>
+          <div class="dash-card-sub">Managing Anxiety · Week 4</div>
+        </div>
       </div>
     </div>
-    <div class="dash-full">
-      <div class="dash-widget">
-        <h3>Today's Mood Check-In</h3>
-        <p style="font-size:14px;color:var(--text-sec);margin-bottom:12px;">How are you feeling right now?</p>
-        <div class="mood-check">
-          <button class="mood-btn" onclick="selectDashMood(this)">😔</button>
-          <button class="mood-btn" onclick="selectDashMood(this)">😟</button>
-          <button class="mood-btn" onclick="selectDashMood(this)">😐</button>
-          <button class="mood-btn selected" onclick="selectDashMood(this)">🙂</button>
-          <button class="mood-btn" onclick="selectDashMood(this)">😊</button>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="dash-full" style="display: none;">
+      <h2>Account Settings</h2>
+      <div class="settings-form">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="settings-name" placeholder="Your full name">
         </div>
-        <input class="search-input" style="margin:12px 0;" placeholder="Add a word (optional): tired, hopeful, anxious...">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-          <button class="pill">Work</button><button class="pill active">Relationships</button>
-          <button class="pill">Sleep</button><button class="pill">Health</button>
+        
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="settings-email" placeholder="you@example.com">
         </div>
-        <button class="btn btn-primary" onclick="this.textContent='✓ Mood logged!';this.style.background='var(--success)';">Log Mood</button>
-        <div class="mood-chart-placeholder" id="moodChart" style="margin-top:20px;"></div>
+        
+        <div class="form-group">
+          <label>New Password (leave blank if not changing)</label>
+          <input type="password" id="settings-password" placeholder="••••••••">
+        </div>
+
+        <button onclick="saveSettings()" class="btn btn-primary" style="margin-top:20px; padding:12px 32px;">Save Changes</button>
       </div>
     </div>
   </div>
@@ -91,21 +92,77 @@
 <script>
 function checkAuth() {
   const token = localStorage.getItem('afya_token');
-  if (!token) {
+  const userData = localStorage.getItem('afya_user');
+  if (!token || !userData) {
     alert('Please login to access the dashboard');
     window.location.href = 'login.html';
-    return false;
+    return null;
   }
-  return true;
+  return JSON.parse(userData);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  if (!checkAuth()) return;
+function loadUserData(user) {
+  const name = user.name || user.email?.split('@')[0] || "User";
+  
+  document.getElementById('user-fullname').textContent = name;
+  document.getElementById('user-avatar').textContent = name.substring(0, 2).toUpperCase();
+  document.getElementById('welcome-message').textContent = `Good morning, ${name} ☀️`;
 
-  fetch('header.html').then(r => r.text()).then(html => {
-    document.getElementById('header-container').innerHTML = html;
-    buildMoodChart();
-  });
+  // Fill settings
+  document.getElementById('settings-name').value = user.name || '';
+  document.getElementById('settings-email').value = user.email || '';
+}
+
+function switchTab(tabIndex) {
+  // Hide all panels
+  document.getElementById('overview-panel').style.display = 'none';
+  document.getElementById('settings-panel').style.display = 'none';
+
+  // Show selected panel
+  if (tabIndex === 8) {
+    document.getElementById('settings-panel').style.display = 'block';
+  } else {
+    document.getElementById('overview-panel').style.display = 'block';
+  }
+
+  // Update active class
+  document.querySelectorAll('.sidebar-link').forEach(link => link.classList.remove('active'));
+  if (tabIndex === 8) {
+    document.getElementById('settings-link').classList.add('active');
+  } else {
+    document.querySelector('.sidebar-link').classList.add('active');
+  }
+}
+
+function saveSettings() {
+  const name = document.getElementById('settings-name').value.trim();
+  const email = document.getElementById('settings-email').value.trim();
+  const password = document.getElementById('settings-password').value.trim();
+
+  let user = JSON.parse(localStorage.getItem('afya_user') || '{}');
+
+  if (name) user.name = name;
+  if (email) user.email = email;
+
+  localStorage.setItem('afya_user', JSON.stringify(user));
+
+  alert('✅ Settings saved successfully!');
+  loadUserData(user);
+}
+
+// Initialize Dashboard
+document.addEventListener('DOMContentLoaded', () => {
+  const user = checkAuth();
+  if (!user) return;
+
+  fetch('header.html')
+    .then(r => r.text())
+    .then(html => {
+      document.getElementById('header-container').innerHTML = html;
+    });
+
+  loadUserData(user);
+  switchTab(0); // Start with Overview
 });
 </script>
 </body>

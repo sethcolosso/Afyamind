@@ -14,51 +14,231 @@
 <div id="header-container"></div>
 
 <div class="community-layout">
+  <!-- Sidebar -->
   <div class="groups-sidebar">
-    <input class="search-input" placeholder="🔍 Find a group...">
+    <input class="search-input" placeholder="🔍 Find a group..." id="search-input">
+    
+    <div style="margin:20px 0 10px;">
+      <button class="btn btn-primary" onclick="createNewForum()" style="width:100%;">
+        + Create New Forum
+      </button>
+    </div>
+
     <h3>My Groups</h3>
-    <div class="group-item active">
-      <div class="group-icon" style="background:var(--primary-light);">😰</div>
-      <div><div class="group-name">Anxiety Support</div><div class="group-members">2,341 members</div></div>
-      <div class="unread-badge">3</div>
-    </div>
+    <div id="my-groups"></div>
+
     <h3>Suggested</h3>
-    <div class="group-item">
-      <div class="group-icon" style="background:var(--purple-light);">💙</div>
-      <div><div class="group-name">Depression Circle</div><div class="group-members">1,892 members</div></div>
-    </div>
-    <div class="group-item">
-      <div class="group-icon" style="background:#FEF3E0;">🌸</div>
-      <div><div class="group-name">Women's Wellness</div><div class="group-members">3,210 members</div></div>
-    </div>
+    <div id="suggested-groups"></div>
   </div>
+
+  <!-- Main Feed / Chat Area -->
   <div class="feed-main">
-    <div class="group-header-bar">
+    <div class="group-header-bar" id="group-header">
       <div class="group-header-info">
-        <h2>😰 Anxiety Support</h2>
-        <p>2,341 members · Moderated by certified counsellors</p>
+        <h2 id="group-title">Select a group</h2>
+        <p id="group-subtitle">Join the conversation</p>
       </div>
-      <div style="display:flex;gap:8px;">
-        <span class="session-badge badge-teal">✓ Moderated</span>
-        <button class="btn btn-secondary" style="font-size:13px;padding:7px 16px;">Joined</button>
-      </div>
+      <div style="display:flex;gap:8px;" id="header-actions"></div>
     </div>
-    <div class="feed-post">
-      <div class="post-header">
-        <div class="anon-avatar" style="background:var(--primary-light);">🌿</div>
-        <div><div class="post-author" style="color:var(--primary);">Community Guide</div><div class="post-time">Welcome</div></div>
-      </div>
-      <p class="post-text">Welcome to Anxiety Support! This is a safe, anonymous space where you can share your experiences. Be respectful, supportive, and kind. 💚</p>
+
+    <!-- Chat Messages -->
+    <div class="chat-messages" id="chat-messages">
+      <!-- Messages loaded by JS -->
+    </div>
+
+    <!-- Message Input -->
+    <div class="chat-input-area" id="chat-input-area" style="display:none;">
+      <input type="text" id="message-input" placeholder="Write a message..." 
+             onkeypress="if(event.key === 'Enter') sendMessage()">
+      <button onclick="sendMessage()" class="btn btn-primary">Send</button>
     </div>
   </div>
 </div>
 
 <script src="common.js"></script>
 <script>
+// Data
+let forums = JSON.parse(localStorage.getItem('afyaForums')) || [
+  {
+    id: 1,
+    title: "Anxiety Support",
+    icon: "😰",
+    members: 2341,
+    moderated: true,
+    joined: true,
+    messages: [
+      { user: "Community Guide", text: "Welcome to Anxiety Support! This is a safe, anonymous space...", time: "10:15" },
+      { user: "Wanjiku", text: "I've been struggling with overthinking lately. Anyone else?", time: "10:20" }
+    ]
+  },
+  {
+    id: 2,
+    title: "Depression Circle",
+    icon: "💙",
+    members: 1892,
+    moderated: false,
+    joined: false,
+    messages: []
+  },
+  {
+    id: 3,
+    title: "Women's Wellness",
+    icon: "🌸",
+    members: 3210,
+    moderated: true,
+    joined: false,
+    messages: []
+  }
+];
+
+let currentForumId = null;
+
+// Render Groups
+function renderGroups() {
+  const myGroups = document.getElementById('my-groups');
+  const suggested = document.getElementById('suggested-groups');
+  
+  myGroups.innerHTML = '';
+  suggested.innerHTML = '';
+
+  forums.forEach(forum => {
+    const div = document.createElement('div');
+    div.className = `group-item ${currentForumId === forum.id ? 'active' : ''}`;
+    div.innerHTML = `
+      <div class="group-icon" style="background:var(--primary-light);">${forum.icon}</div>
+      <div>
+        <div class="group-name">${forum.title}</div>
+        <div class="group-members">${forum.members} members</div>
+      </div>
+      ${forum.joined ? '<div class="unread-badge">Joined</div>' : ''}
+    `;
+    div.onclick = () => openForum(forum.id);
+    
+    if (forum.joined) {
+      myGroups.appendChild(div);
+    } else {
+      suggested.appendChild(div);
+    }
+  });
+}
+
+function openForum(forumId) {
+  currentForumId = forumId;
+  const forum = forums.find(f => f.id === forumId);
+  if (!forum) return;
+
+  document.getElementById('group-title').textContent = forum.title;
+  document.getElementById('group-subtitle').textContent = `${forum.members} members · ${forum.moderated ? 'Moderated' : ''}`;
+
+  const headerActions = document.getElementById('header-actions');
+  headerActions.innerHTML = forum.joined 
+    ? `<button class="btn btn-secondary" style="font-size:13px;padding:7px 16px;">Joined</button>`
+    : `<button class="btn btn-primary" onclick="joinForum(${forum.id})">Join Group</button>`;
+
+  renderMessages(forum);
+  document.getElementById('chat-input-area').style.display = forum.joined ? 'flex' : 'none';
+  renderGroups();
+}
+
+function renderMessages(forum) {
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = '';
+
+  forum.messages.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = 'feed-post';
+    div.innerHTML = `
+      <div class="post-header">
+        <div class="anon-avatar" style="background:var(--primary-light);">${msg.user === "Community Guide" ? "🌿" : "👤"}</div>
+        <div>
+          <div class="post-author" style="color:var(--primary);">${msg.user}</div>
+          <div class="post-time">${msg.time}</div>
+        </div>
+      </div>
+      <p class="post-text">${msg.text}</p>
+    `;
+    container.appendChild(div);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+function sendMessage() {
+  const token = localStorage.getItem('afya_token');
+  if (!token) {
+    alert("Please login to send messages");
+    return;
+  }
+
+  const input = document.getElementById('message-input');
+  const text = input.value.trim();
+  if (!text || !currentForumId) return;
+
+  const forum = forums.find(f => f.id === currentForumId);
+  const user = JSON.parse(localStorage.getItem('afya_user') || '{}');
+
+  forum.messages.push({
+    user: user.name || "You",
+    text: text,
+    time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+  });
+
+  localStorage.setItem('afyaForums', JSON.stringify(forums));
+  renderMessages(forum);
+  input.value = '';
+}
+
+function joinForum(forumId) {
+  const token = localStorage.getItem('afya_token');
+  if (!token) {
+    alert("Please login to join groups");
+    window.location.href = 'login.html';
+    return;
+  }
+
+  const forum = forums.find(f => f.id === forumId);
+  if (forum) forum.joined = true;
+
+  localStorage.setItem('afyaForums', JSON.stringify(forums));
+  openForum(forumId);
+}
+
+function createNewForum() {
+  const token = localStorage.getItem('afya_token');
+  if (!token) {
+    alert("You must be logged in to create a forum");
+    window.location.href = 'login.html';
+    return;
+  }
+
+  const title = prompt("Enter new forum name:");
+  if (!title) return;
+
+  const newForum = {
+    id: Date.now(),
+    title: title,
+    icon: "💬",
+    members: 1,
+    moderated: true,
+    joined: true,
+    messages: []
+  };
+
+  forums.unshift(newForum);
+  localStorage.setItem('afyaForums', JSON.stringify(forums));
+  renderGroups();
+  openForum(newForum.id);
+}
+
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
   fetch('header.html').then(r => r.text()).then(html => {
     document.getElementById('header-container').innerHTML = html;
   });
+
+  renderGroups();
+  // Open first joined group by default
+  const firstJoined = forums.find(f => f.joined);
+  if (firstJoined) openForum(firstJoined.id);
 });
 </script>
 </body>

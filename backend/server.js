@@ -5,7 +5,13 @@
  * Run: node server.js  OR  npm run dev (with nodemon)
  */
 
+const path = require("path");
+// Load env from backend/.env first (if present), then fall back to the
+// project-root env files where v0 / Vercel place project + integration vars.
 require("dotenv").config();
+require("dotenv").config({ path: path.resolve(__dirname, "../.env.development.local") });
+require("dotenv").config({ path: path.resolve(__dirname, "../.env.local") });
+require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
@@ -218,7 +224,7 @@ LANGUAGE:
 
 Remember: You are a warm, culturally-grounded guide. You hold space. You do not fix.`;
 
-// ── ROUTES ────────────────────────────────────────────────────
+// ── ROUTES ───────────────────────���────────────────────────────
 
 // Health check
 app.get("/", (req, res) => {

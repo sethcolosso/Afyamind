@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "AfyaMind — Mental wellness platform for East Africa",
   "scripts": {
+    "postinstall": "cd backend && npm install",
     "dev": "cd backend && npm run dev",
     "install:backend": "cd backend && npm install",
     "start:backend": "cd backend && npm run dev"

@@ -21,11 +21,20 @@ const bcrypt = require("bcryptjs");
 const supabase = require("./supabase");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+// Prefer the platform-provided port (v0/Vercel set PORT or DEV_PORT). The
+// preview proxy watches this port, so we must bind to it. Falls back to 3001
+// for standalone local runs.
+const PORT = process.env.PORT || process.env.DEV_PORT || 3001;
 
 // ── Gemini client ────────────────────────────────────────────
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
+
+// ── Static frontend ───────────────────────────────────────────
+// Serve the static HTML/CSS/JS UI from ../frontend so the whole app
+// loads from this single server (and the v0 preview shows the UI).
+const FRONTEND_DIR = path.resolve(__dirname, "../frontend");
+app.use(express.static(FRONTEND_DIR));
 
 // ── Middleware ─────────────────────────────────────────────────
 app.use(express.json({ limit: "10kb" }));
@@ -226,8 +235,13 @@ Remember: You are a warm, culturally-grounded guide. You hold space. You do not 
 
 // ── ROUTES ───────────────────────���────────────────────────────
 
-// Health check
+// Home page → serve the frontend UI
 app.get("/", (req, res) => {
+  res.sendFile(path.join(FRONTEND_DIR, "home.html"));
+});
+
+// Health check / API status
+app.get("/api", (req, res) => {
   res.json({
     status: "AfyaMind API is running 🌿",
     version: "1.0.0",

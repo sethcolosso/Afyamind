@@ -9,5 +9,8 @@
     "start:backend": "cd backend && npm run dev"
   },
   "author": "AfyaMind",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "mammoth": "^1.12.0"
+  }
 }

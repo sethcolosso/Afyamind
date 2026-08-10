@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Understanding & Managing Anxiety and Stress — AfyaMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="learn.css">
+<link rel="stylesheet" href="course.css">
+</head>
+<body class="course-page" style="background:#d4cea5;">
+
+<div id="header-container"></div>
+
+<div class="course-hero">
+  <div class="container">
+    <a class="course-crumb" href="learn.html">← Back to Learn &amp; Grow</a>
+    <div class="course-hero-grid">
+      <div>
+        <span class="course-hero-badge">🧠 Course · Anxiety</span>
+        <h1 id="course-title">Understanding &amp; Managing Anxiety and Stress</h1>
+        <p class="course-tagline">Six self-paced modules that help you understand what anxiety actually is, recognize your own patterns, and build tools you can use immediately — and for the long run.</p>
+        <div class="course-hero-meta">
+          <span>👤 General adults</span>
+          <span>📦 6 modules · 18 lessons</span>
+          <span>⏱ 45–60 min total</span>
+        </div>
+      </div>
+      <div class="hero-progress-ring">
+        <span id="hero-progress-num">0%</span>
+        <span class="rp-label">complete</span>
+        <button id="resume-btn">Resume</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="course-shell">
+  <aside>
+    <div class="course-progress-wrap">
+      <div id="course-progress-label">0% complete</div>
+      <div class="progress-track"><div id="course-progress-fill"></div></div>
+    </div>
+    <nav id="course-nav" aria-label="Course modules"></nav>
+  </aside>
+
+  <main id="course-main"></main>
+</div>
+
+<script src="common.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('header.html').then(r => r.text()).then(html => {
+    document.getElementById('header-container').innerHTML = html;
+  }).catch(() => {});
+});
+</script>
+<script src="course.js"></script>
+</body>
+</html>

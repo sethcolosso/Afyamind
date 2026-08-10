@@ -67,6 +67,16 @@
         <div class="article-excerpt">Sleep and mental health are deeply connected. Learn practical tips for better sleep.</div>
       </div>
     </div>
+
+    <!-- Anxiety & Stress Course card -->
+    <a class="article-card" href="course-anxiety-depression.html" style="background:#e8ddf7;text-decoration:none;color:inherit;display:block;cursor:pointer;">
+      <div class="article-thumb" style="background:linear-gradient(135deg,#c8a4f7,#95babe);display:flex;align-items:center;justify-content:center;font-size:40px;">🧠</div>
+      <div class="article-body">
+        <span class="cat-badge" style="background:var(--purple-light);color:var(--purple);font-size:11px;">🎓 Course · 6 modules</span>
+        <div class="article-title">Understanding &amp; Managing Anxiety and Stress</div>
+        <div class="article-excerpt">18 interactive lessons — breathing exercises, guided resets, thought records and more.</div>
+      </div>
+    </a>
   </div>
 </div>
 
@@ -101,12 +111,12 @@ function nextSlide() {
 setInterval(nextSlide, 4000);
 
 // Manual controls
-document.querySelector('.prev').addEventListener('click', () => {
+document.querySelector('.prev')?.addEventListener('click', () => {
   currentSlide = (currentSlide - 1 + slides.length) % slides.length;
   showSlide(currentSlide);
 });
 
-document.querySelector('.next').addEventListener('click', nextSlide);
+document.querySelector('.next')?.addEventListener('click', nextSlide);
 
 // Click on dots
 dots.forEach((dot, index) => {

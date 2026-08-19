@@ -16,66 +16,360 @@
 <div class="find-help-layout">
   <div class="providers-panel">
     <div class="filters-bar">
-      <input class="search-input" type="text" placeholder="🔍 Search by name, speciality, or location...">
-      <div class="filter-pills" style="margin-top:12px;">
-        <button class="pill active">All</button>
-        <button class="pill">Therapist</button>
-        <button class="pill">Psychiatrist</button>
-        <button class="pill">Counsellor</button>
-        <button class="pill">Coach</button>
+      <input class="search-input" type="text" id="search-input" placeholder="🔍 Search by name, speciality, or location...">
+      <div class="filter-pills" id="type-pills" style="margin-top:12px;">
+        <button class="pill active" data-type="All">All</button>
+        <button class="pill" data-type="Therapist">Therapist</button>
+        <button class="pill" data-type="Psychiatrist">Psychiatrist</button>
+        <button class="pill" data-type="Counsellor">Counsellor</button>
+        <button class="pill" data-type="Coach">Coach</button>
       </div>
-      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="pill">🗣 Swahili</button>
-        <button class="pill">💻 Video</button>
-        <button class="pill">📍 In-person</button>
-        <button class="pill active">Today</button>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;" id="extra-pills">
+        <button class="pill" data-lang="sw">🗣 Swahili</button>
+        <button class="pill" data-mode="video">💻 Video</button>
+        <button class="pill" data-mode="in-person">📍 In-person</button>
       </div>
     </div>
-    <div style="padding:12px 16px;font-size:13px;color:var(--text-muted);border-bottom:1px solid var(--border);">Showing <strong style="color:var(--text);">47 providers</strong></div>
-    <div class="provider-list">
-      <div class="provider-card">
-        <div class="provider-top">
-          <div class="provider-avatar" style="background:linear-gradient(135deg,var(--primary),#1D9E75);">AH<div class="verified-badge">✓</div></div>
-          <div class="provider-info">
-            <div class="provider-name">Dr. Amina Hassan</div>
-            <div class="provider-creds">MScCP · KPA Registered</div>
-            <div class="provider-rating">★★★★★ <span>4.9</span> <span style="color:var(--text-muted);">(47 reviews)</span></div>
-          </div>
-        </div>
-        <div class="provider-tags">
-          <span class="tag">Anxiety</span><span class="tag">Depression</span><span class="tag">Trauma</span>
-        </div>
-        <div class="provider-details">
-          <div>🇰🇪 Swahili, English · 💻 Video, In-person</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div class="provider-price">KES 2,500 / session</div>
-          <div class="provider-next">Tomorrow at 10:00 AM</div>
-        </div>
-        <div class="provider-actions">
-          <button class="btn-sm btn-sm-outline">View Profile</button>
-          <button class="btn-sm btn-sm-primary">Book Session</button>
-        </div>
-      </div>
+    <div style="padding:12px 16px;font-size:13px;color:var(--text-muted);border-bottom:1px solid var(--border);">
+      Showing <strong style="color:var(--text);" id="provider-count">0 providers</strong>
+    </div>
+    <div class="provider-list" id="provider-list">
+      <!-- Rendered by JS -->
     </div>
   </div>
+
   <div class="map-panel">
-    <div class="map-placeholder">
+    <div class="map-placeholder" id="map-placeholder">
       <div style="font-size:48px;margin-bottom:12px;">🗺️</div>
       <h3>Provider Map</h3>
-      <p style="font-size:14px;max-width:280px;line-height:1.6;">Interactive map showing providers near you.</p>
-      <button class="btn btn-primary" style="margin-top:20px;">Enable Location</button>
+      <p style="font-size:14px;max-width:280px;line-height:1.6;" id="map-text">
+        Enable location to see how far each provider is from you, and we'll sort the nearest ones to the top.
+      </p>
+      <button class="btn btn-primary" style="margin-top:20px;" id="enable-location-btn" onclick="enableLocation()">Enable Location</button>
     </div>
+  </div>
+</div>
+
+<!-- Booking modal -->
+<div id="booking-overlay" class="booking-overlay" style="display:none;">
+  <div class="booking-modal">
+    <button class="booking-close" onclick="closeBooking()">✕</button>
+    <h3 id="booking-title">Book a session</h3>
+    <p id="booking-sub" style="color:var(--text-muted);font-size:13.5px;margin-bottom:16px;"></p>
+
+    <label class="booking-label">Date &amp; time</label>
+    <input type="datetime-local" id="booking-datetime" class="search-input" style="margin-bottom:14px;">
+
+    <label class="booking-label">Session mode</label>
+    <select id="booking-mode" class="search-input" style="margin-bottom:20px;">
+      <option value="video">💻 Video call</option>
+      <option value="in-person">📍 In-person</option>
+    </select>
+
+    <button class="btn btn-primary" style="width:100%;" onclick="confirmBooking()">Confirm Booking</button>
+    <p id="booking-status" style="margin-top:10px;font-size:13px;"></p>
   </div>
 </div>
 
 <script src="common.js"></script>
 <script>
+// ── Config ──────────────────────────────────────────────────
+const API_BASE = 'http://localhost:3001'; // change if your backend runs elsewhere
+
+function getToken() { return localStorage.getItem('afya_token'); }
+function isLoggedIn() { return !!getToken(); }
+
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed (${res.status})`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+// ── Demo provider directory ─────────────────────────────────
+// NOTE: this is static frontend data for now (not in Supabase yet).
+// It's structured so it can be moved into a `providers` table later
+// with minimal changes — each object below would become one row.
+const PROVIDERS = [
+  { id: 'p1', name: 'Dr. Amina Hassan', type: 'Therapist', creds: 'MScCP · KPA Registered', rating: 4.9, reviews: 47,
+    specialties: ['Anxiety', 'Depression', 'Trauma'], languages: ['sw', 'en'], modes: ['video', 'in-person'],
+    price: 2500, city: 'Nairobi', lat: -1.2864, lng: 36.8172 },
+  { id: 'p2', name: 'Dr. Brian Otieno', type: 'Psychiatrist', creds: 'MBChB, MMed Psych', rating: 4.8, reviews: 63,
+    specialties: ['Medication Management', 'Bipolar', 'Psychosis'], languages: ['en'], modes: ['video'],
+    price: 4000, city: 'Nairobi', lat: -1.3031, lng: 36.7820 },
+  { id: 'p3', name: 'Grace Wanjiru', type: 'Counsellor', creds: 'BA Counselling Psych', rating: 4.7, reviews: 31,
+    specialties: ['Grief', 'Relationships', 'Anxiety'], languages: ['sw', 'en'], modes: ['in-person'],
+    price: 1800, city: 'Nairobi', lat: -1.2833, lng: 36.8167 },
+  { id: 'p4', name: 'Samuel Mwangi', type: 'Coach', creds: 'ICF Certified Life Coach', rating: 4.6, reviews: 22,
+    specialties: ['Stress', 'Career', 'Motivation'], languages: ['sw', 'en'], modes: ['video', 'in-person'],
+    price: 1500, city: 'Nairobi', lat: -1.2921, lng: 36.8219 },
+  { id: 'p5', name: 'Dr. Fatuma Ali', type: 'Therapist', creds: 'MSc Clinical Psychology', rating: 4.9, reviews: 55,
+    specialties: ['Addiction', 'Trauma', 'PTSD'], languages: ['sw', 'en'], modes: ['video'],
+    price: 3000, city: 'Mombasa', lat: -4.0435, lng: 39.6682 },
+  { id: 'p6', name: 'Dr. Peter Kamau', type: 'Psychiatrist', creds: 'MBChB, MMed Psych', rating: 4.7, reviews: 40,
+    specialties: ['Anxiety', 'Depression', 'Sleep'], languages: ['en', 'sw'], modes: ['video', 'in-person'],
+    price: 3800, city: 'Kisumu', lat: -0.0917, lng: 34.7680 },
+  { id: 'p7', name: 'Sarah Nakato', type: 'Counsellor', creds: 'BA Counselling', rating: 4.5, reviews: 18,
+    specialties: ['Family', 'Relationships'], languages: ['en'], modes: ['in-person'],
+    price: 1600, city: 'Kampala', lat: 0.3476, lng: 32.5825 },
+  { id: 'p8', name: "Dr. Neema Mushi", type: 'Therapist', creds: 'MSc Clinical Psychology', rating: 4.8, reviews: 29,
+    specialties: ['Depression', "Women's Wellness"], languages: ['sw', 'en'], modes: ['video', 'in-person'],
+    price: 2200, city: 'Dar es Salaam', lat: -6.7924, lng: 39.2083 },
+];
+
+let filters = { type: 'All', lang: null, mode: null, query: '' };
+let userLocation = null; // { lat, lng }
+let selectedProvider = null;
+
+// ── Distance (Haversine, in km) ─────────────────────────────
+function distanceKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function enableLocation() {
+  const btn = document.getElementById('enable-location-btn');
+  if (!navigator.geolocation) {
+    document.getElementById('map-text').textContent = "Your browser doesn't support location. You can still browse all providers below.";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Finding your location...';
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      document.getElementById('map-placeholder').innerHTML = `
+        <div style="font-size:48px;margin-bottom:12px;">📍</div>
+        <h3>Location enabled</h3>
+        <p style="font-size:14px;max-width:280px;line-height:1.6;">
+          Providers are now sorted by distance from you. The closest one is marked "Nearest to you".
+        </p>`;
+      renderProviders();
+    },
+    (err) => {
+      btn.disabled = false;
+      btn.textContent = 'Enable Location';
+      const msg = err.code === err.PERMISSION_DENIED
+        ? "Location access was denied. You can still browse all providers below — just without distance sorting."
+        : "Couldn't get your location right now. Try again, or browse all providers below.";
+      document.getElementById('map-text').textContent = msg;
+    },
+    { enableHighAccuracy: false, timeout: 10000 }
+  );
+}
+
+// ── Filtering + rendering ───────────────────────────────────
+function matchesFilters(p) {
+  if (filters.type !== 'All' && p.type !== filters.type) return false;
+  if (filters.lang && !p.languages.includes(filters.lang)) return false;
+  if (filters.mode && !p.modes.includes(filters.mode)) return false;
+  if (filters.query) {
+    const q = filters.query.toLowerCase();
+    const haystack = `${p.name} ${p.specialties.join(' ')} ${p.city}`.toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
+  return true;
+}
+
+function renderProviders() {
+  let list = PROVIDERS.filter(matchesFilters);
+
+  let withDistance = list.map(p => ({
+    ...p,
+    distance: userLocation ? distanceKm(userLocation.lat, userLocation.lng, p.lat, p.lng) : null
+  }));
+
+  if (userLocation) {
+    withDistance.sort((a, b) => a.distance - b.distance);
+  }
+
+  document.getElementById('provider-count').textContent = `${withDistance.length} providers`;
+
+  const container = document.getElementById('provider-list');
+  if (!withDistance.length) {
+    container.innerHTML = `<p style="padding:24px;color:var(--text-muted);text-align:center;">No providers match your filters.</p>`;
+    return;
+  }
+
+  container.innerHTML = withDistance.map((p, i) => `
+    <div class="provider-card">
+      <div class="provider-top">
+        <div class="provider-avatar" style="background:linear-gradient(135deg,var(--primary),#1D9E75);">
+          ${initials(p.name)}<div class="verified-badge">✓</div>
+        </div>
+        <div class="provider-info">
+          <div class="provider-name">
+            ${p.name}
+            ${userLocation && i === 0 ? '<span class="nearest-badge">📍 Nearest to you</span>' : ''}
+          </div>
+          <div class="provider-creds">${p.creds} · ${p.city}</div>
+          <div class="provider-rating">★★★★★ <span>${p.rating}</span> <span style="color:var(--text-muted);">(${p.reviews} reviews)</span></div>
+        </div>
+      </div>
+      <div class="provider-tags">
+        ${p.specialties.map(s => `<span class="tag">${s}</span>`).join('')}
+      </div>
+      <div class="provider-details">
+        <div>${p.languages.includes('sw') ? '🇰🇪 Swahili, English' : '🇬🇧 English'} · ${p.modes.map(m => m === 'video' ? '💻 Video' : '📍 In-person').join(', ')}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div class="provider-price">KES ${p.price.toLocaleString()} / session</div>
+        <div class="provider-next">${p.distance != null ? `${p.distance.toFixed(1)} km away` : ''}</div>
+      </div>
+      <div class="provider-actions">
+        <button class="btn-sm btn-sm-outline">View Profile</button>
+        <button class="btn-sm btn-sm-primary" onclick="openBooking('${p.id}')">Book Session</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function initials(name) {
+  return name.replace(/^Dr\.\s*/, '').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+// ── Filter pill wiring ───────────────────────────────────────
+document.getElementById('type-pills').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-type]');
+  if (!btn) return;
+  document.querySelectorAll('#type-pills .pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  filters.type = btn.dataset.type;
+  renderProviders();
+});
+
+document.getElementById('extra-pills').addEventListener('click', (e) => {
+  const btn = e.target.closest('.pill');
+  if (!btn) return;
+  if (btn.dataset.lang) {
+    const active = btn.classList.toggle('active');
+    filters.lang = active ? btn.dataset.lang : null;
+  }
+  if (btn.dataset.mode) {
+    document.querySelectorAll('#extra-pills [data-mode]').forEach(p => { if (p !== btn) p.classList.remove('active'); });
+    const active = btn.classList.toggle('active');
+    filters.mode = active ? btn.dataset.mode : null;
+  }
+  renderProviders();
+});
+
+document.getElementById('search-input').addEventListener('input', (e) => {
+  filters.query = e.target.value.trim();
+  renderProviders();
+});
+
+// ── Booking flow ─────────────────────────────────────────────
+function openBooking(providerId) {
+  if (!isLoggedIn()) {
+    if (confirm('Log in to book a session.\n\nLog in now?')) window.location.href = 'login.html';
+    return;
+  }
+  selectedProvider = PROVIDERS.find(p => p.id === providerId);
+  if (!selectedProvider) return;
+
+  document.getElementById('booking-title').textContent = `Book with ${selectedProvider.name}`;
+  document.getElementById('booking-sub').textContent = `${selectedProvider.type} · KES ${selectedProvider.price.toLocaleString()} / session`;
+  document.getElementById('booking-status').textContent = '';
+
+  const modeSelect = document.getElementById('booking-mode');
+  modeSelect.innerHTML = selectedProvider.modes.map(m =>
+    `<option value="${m}">${m === 'video' ? '💻 Video call' : '📍 In-person'}</option>`
+  ).join('');
+
+  // Default to tomorrow at 10:00
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  tomorrow.setHours(10, 0, 0, 0);
+  document.getElementById('booking-datetime').value = tomorrow.toISOString().slice(0, 16);
+
+  document.getElementById('booking-overlay').style.display = 'flex';
+}
+
+function closeBooking() {
+  document.getElementById('booking-overlay').style.display = 'none';
+  selectedProvider = null;
+}
+
+async function confirmBooking() {
+  const datetime = document.getElementById('booking-datetime').value;
+  const mode = document.getElementById('booking-mode').value;
+  const statusEl = document.getElementById('booking-status');
+
+  if (!datetime) {
+    statusEl.textContent = 'Please choose a date and time.';
+    statusEl.style.color = '#b6592e';
+    return;
+  }
+  if (new Date(datetime) < new Date()) {
+    statusEl.textContent = 'Please choose a future date and time.';
+    statusEl.style.color = '#b6592e';
+    return;
+  }
+
+  try {
+    await api('/api/sessions/book', {
+      method: 'POST',
+      body: JSON.stringify({
+        providerId: selectedProvider.id,
+        providerName: selectedProvider.name,
+        scheduledAt: new Date(datetime).toISOString(),
+        mode,
+        priceKes: selectedProvider.price
+      })
+    });
+    statusEl.style.color = '#4c8b6a';
+    statusEl.textContent = '✅ Session booked! You can see it on your dashboard.';
+    setTimeout(() => { closeBooking(); }, 1600);
+  } catch (err) {
+    statusEl.style.color = '#b6592e';
+    statusEl.textContent = err.message;
+  }
+}
+
+// ── Initialize ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   fetch('header.html').then(r => r.text()).then(html => {
     document.getElementById('header-container').innerHTML = html;
-  });
+  }).catch(() => {});
+
+  renderProviders();
 });
 </script>
+
+<style>
+.nearest-badge {
+  display: inline-block; margin-left: 8px; background: var(--primary-light, #dce8df); color: var(--primary, #5b7f6a);
+  font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; vertical-align: middle;
+}
+.pill.active { background: var(--primary, #5b7f6a); color: #fff; border-color: var(--primary, #5b7f6a); }
+
+.booking-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 999;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.booking-modal {
+  background: #fffdf7; border-radius: 16px; padding: 28px; width: 100%; max-width: 400px; position: relative;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+}
+.booking-close {
+  position: absolute; top: 14px; right: 14px; background: none; border: none; font-size: 16px; cursor: pointer; color: var(--text-muted);
+}
+.booking-label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+</style>
 </body>
 </html>

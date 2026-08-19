@@ -50,6 +50,26 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+// ── Optional-auth middleware ─────────────────────────────────
+// Like verifyToken, but never blocks the request. If a valid token
+// is present, req.user is set; otherwise req.user stays null.
+// Used for community endpoints that behave differently for
+// logged-in vs logged-out visitors (viewing groups/posts) without
+// locking logged-out visitors out entirely.
+const optionalAuth = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    req.user = null;
+  }
+  next();
+};
+
 // Rate limiting — protect the AI endpoint
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -243,6 +263,18 @@ app.get("/", (req, res) => {
       profile: {
         get: "GET /api/user/profile (requires auth)",
         update: "PUT /api/user/profile (requires auth)",
+      },
+      community: {
+        listGroups: "GET /api/groups",
+        myGroups: "GET /api/user/groups (requires auth)",
+        createGroup: "POST /api/groups (requires auth)",
+        joinGroup: "POST /api/groups/:id/join (requires auth)",
+        viewGroup: "POST /api/groups/:id/view",
+        listPosts: "GET /api/groups/:id/posts",
+        createPost: "POST /api/groups/:id/posts (requires auth + membership)",
+        listComments: "GET /api/posts/:id/comments",
+        createComment: "POST /api/posts/:id/comments (requires auth)",
+        toggleLike: "POST /api/posts/:id/like (requires auth)",
       },
     },
   });
@@ -505,7 +537,7 @@ Respond with exactly 3 insights as a JSON array:
 
 app.post("/api/mood/log", verifyToken, async (req, res) => {
   try {
-    const { score, label, triggers } = req.body;
+    const { score, label, triggers, note } = req.body;
     const userId = req.user.id;
 
     if (!score || score < 1 || score > 5) {
@@ -519,6 +551,7 @@ app.post("/api/mood/log", verifyToken, async (req, res) => {
         score,
         label: label || null,
         triggers: triggers || [],
+        note: note || null,
       })
       .select()
       .single();
@@ -531,6 +564,52 @@ app.post("/api/mood/log", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Failed to save mood log" });
   }
 });
+
+/**
+ * GET /api/mood/streak
+ * Consecutive-day mood-logging streak. Missing exactly one day is
+ * tolerated (grace day); missing two or more days in a row resets
+ * the streak to 0.
+ */
+app.get("/api/mood/streak", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("mood_logs")
+      .select("created_at")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    res.json({ streak: computeMoodStreak(data.map((r) => r.created_at)) });
+  } catch (error) {
+    console.error("Mood streak error:", error.message);
+    res.status(500).json({ error: "Failed to compute streak" });
+  }
+});
+
+function dateKey(d) {
+  return new Date(d).toISOString().slice(0, 10);
+}
+function diffDays(fromKey, toKey) {
+  const a = new Date(fromKey + "T00:00:00Z");
+  const b = new Date(toKey + "T00:00:00Z");
+  return Math.round((b - a) / 86400000);
+}
+function computeMoodStreak(timestamps) {
+  const uniqueDaysDesc = [...new Set(timestamps.map(dateKey))].sort().reverse();
+  if (!uniqueDaysDesc.length) return 0;
+
+  const todayKey = dateKey(new Date());
+  if (diffDays(uniqueDaysDesc[0], todayKey) >= 3) return 0; // 2+ full days missed since last log
+
+  let streak = 1;
+  for (let i = 0; i < uniqueDaysDesc.length - 1; i++) {
+    const gap = diffDays(uniqueDaysDesc[i + 1], uniqueDaysDesc[i]);
+    if (gap <= 2) streak++; // same day or one day skipped — still counts
+    else break; // 2+ days skipped — streak ends here
+  }
+  return streak;
+}
 
 app.get("/api/mood/logs", verifyToken, async (req, res) => {
   try {
@@ -615,6 +694,490 @@ app.put("/api/user/profile", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("Update profile error:", error.message);
     res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// COMMUNITY ROUTES — groups, membership, posts, comments, likes
+// ═══════════════════════════════════════════════════════════════
+
+// ── GROUPS ────────────────────────────────────────────────────
+
+/**
+ * GET /api/groups
+ * List all groups with member/post counts, view counts, and
+ * (if logged in) whether the current user has joined each one.
+ * Works for both logged-in and anonymous visitors.
+ */
+app.get("/api/groups", optionalAuth, async (req, res) => {
+  try {
+    const { data: groups, error } = await supabase
+      .from("groups")
+      .select("*")
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+
+    const { data: memberRows } = await supabase
+      .from("group_members")
+      .select("group_id, user_id");
+    const { data: postRows } = await supabase
+      .from("group_posts")
+      .select("group_id");
+
+    const myJoinedIds = new Set(
+      (memberRows || [])
+        .filter((m) => req.user && m.user_id === req.user.id)
+        .map((m) => m.group_id)
+    );
+
+    const result = groups.map((g) => ({
+      ...g,
+      member_count: (memberRows || []).filter((m) => m.group_id === g.id).length,
+      post_count: (postRows || []).filter((p) => p.group_id === g.id).length,
+      joined: myJoinedIds.has(g.id),
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error("List groups error:", error.message);
+    res.status(500).json({ error: "Failed to fetch groups" });
+  }
+});
+
+/**
+ * GET /api/user/groups
+ * Groups the CURRENT logged-in user has joined. Used by the
+ * dashboard's "My Groups" widget.
+ */
+app.get("/api/user/groups", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("group_members")
+      .select("joined_at, groups (id, title, icon, description, moderated, views_count)")
+      .eq("user_id", req.user.id)
+      .order("joined_at", { ascending: false });
+    if (error) throw error;
+
+    res.json(data.map((row) => ({ ...row.groups, joined_at: row.joined_at })));
+  } catch (error) {
+    console.error("Get user groups error:", error.message);
+    res.status(500).json({ error: "Failed to fetch your groups" });
+  }
+});
+
+/**
+ * POST /api/groups
+ * Create a new group/forum. Requires login. Creator auto-joins.
+ * Body: { title, icon?, description? }
+ */
+app.post("/api/groups", verifyToken, async (req, res) => {
+  try {
+    const { title, icon, description } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "Group title is required" });
+    }
+
+    const { data: group, error } = await supabase
+      .from("groups")
+      .insert({
+        title: title.trim(),
+        icon: icon || "💬",
+        description: description || null,
+        moderated: true,
+        created_by: req.user.id,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    await supabase
+      .from("group_members")
+      .insert({ group_id: group.id, user_id: req.user.id });
+
+    res.status(201).json(group);
+  } catch (error) {
+    console.error("Create group error:", error.message);
+    if (error.code === "23505") {
+      return res.status(400).json({ error: "A group with that name already exists" });
+    }
+    res.status(500).json({ error: "Failed to create group" });
+  }
+});
+
+/**
+ * POST /api/groups/:id/join
+ * Join a group. Requires login. Safe to call twice (no-op if
+ * already a member).
+ */
+app.post("/api/groups/:id/join", verifyToken, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from("group_members")
+      .insert({ group_id: req.params.id, user_id: req.user.id });
+    // Ignore "already a member" unique-violation errors
+    if (error && error.code !== "23505") throw error;
+
+    res.json({ joined: true });
+  } catch (error) {
+    console.error("Join group error:", error.message);
+    res.status(500).json({ error: "Failed to join group" });
+  }
+});
+
+/**
+ * POST /api/groups/:id/view
+ * Increments the group's view counter. No auth required — this
+ * counts visits from anyone, logged in or not.
+ */
+app.post("/api/groups/:id/view", async (req, res) => {
+  try {
+    const { error } = await supabase.rpc("increment_group_views", {
+      gid: req.params.id,
+    });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("View increment error:", error.message);
+    res.status(500).json({ error: "Failed to record view" });
+  }
+});
+
+// ── POSTS ─────────────────────────────────────────────────────
+
+/**
+ * GET /api/groups/:id/posts
+ * List posts in a group, each with like count and (if logged in)
+ * whether the current user has liked it, plus comment count.
+ * Viewable by anyone, logged in or not.
+ */
+app.get("/api/groups/:id/posts", optionalAuth, async (req, res) => {
+  try {
+    const { data: posts, error } = await supabase
+      .from("group_posts")
+      .select("*, users:user_id (first_name, last_name)")
+      .eq("group_id", req.params.id)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+
+    const postIds = posts.map((p) => p.id);
+    const { data: likeRows } = postIds.length
+      ? await supabase.from("post_likes").select("post_id, user_id").in("post_id", postIds)
+      : { data: [] };
+    const { data: commentRows } = postIds.length
+      ? await supabase.from("post_comments").select("post_id").in("post_id", postIds)
+      : { data: [] };
+
+    const result = posts.map((p) => ({
+      ...p,
+      author_name: p.users ? `${p.users.first_name} ${p.users.last_name || ""}`.trim() : "Member",
+      like_count: (likeRows || []).filter((l) => l.post_id === p.id).length,
+      liked_by_me: !!(req.user && (likeRows || []).some((l) => l.post_id === p.id && l.user_id === req.user.id)),
+      comment_count: (commentRows || []).filter((c) => c.post_id === p.id).length,
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error("List posts error:", error.message);
+    res.status(500).json({ error: "Failed to fetch posts" });
+  }
+});
+
+/**
+ * POST /api/groups/:id/posts
+ * Create a post in a group. Requires login AND group membership
+ * (join the group first).
+ * Body: { text }
+ */
+app.post("/api/groups/:id/posts", verifyToken, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: "Post text is required" });
+    }
+
+    const { data: membership } = await supabase
+      .from("group_members")
+      .select("id")
+      .eq("group_id", req.params.id)
+      .eq("user_id", req.user.id)
+      .single();
+    if (!membership) {
+      return res.status(403).json({ error: "Join the group before posting" });
+    }
+
+    const { data: post, error } = await supabase
+      .from("group_posts")
+      .insert({ group_id: req.params.id, user_id: req.user.id, text: text.trim() })
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.status(201).json(post);
+  } catch (error) {
+    console.error("Create post error:", error.message);
+    res.status(500).json({ error: "Failed to create post" });
+  }
+});
+
+// ── COMMENTS ──────────────────────────────────────────────────
+
+/**
+ * GET /api/posts/:id/comments
+ * Viewable by anyone, logged in or not.
+ */
+app.get("/api/posts/:id/comments", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("post_comments")
+      .select("*, users:user_id (first_name, last_name)")
+      .eq("post_id", req.params.id)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+
+    res.json(
+      data.map((c) => ({
+        ...c,
+        author_name: c.users ? `${c.users.first_name} ${c.users.last_name || ""}`.trim() : "Member",
+      }))
+    );
+  } catch (error) {
+    console.error("List comments error:", error.message);
+    res.status(500).json({ error: "Failed to fetch comments" });
+  }
+});
+
+/**
+ * POST /api/posts/:id/comments
+ * Requires login.
+ * Body: { text }
+ */
+app.post("/api/posts/:id/comments", verifyToken, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: "Comment text is required" });
+    }
+
+    const { data: comment, error } = await supabase
+      .from("post_comments")
+      .insert({ post_id: req.params.id, user_id: req.user.id, text: text.trim() })
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.status(201).json(comment);
+  } catch (error) {
+    console.error("Create comment error:", error.message);
+    res.status(500).json({ error: "Failed to add comment" });
+  }
+});
+
+// ── LIKES ─────────────────────────────────────────────────────
+
+/**
+ * POST /api/posts/:id/like
+ * Toggles a like on/off for the current user. Requires login.
+ * Returns the new state: { liked: true|false, like_count }
+ */
+app.post("/api/posts/:id/like", verifyToken, async (req, res) => {
+  try {
+    const { data: existing } = await supabase
+      .from("post_likes")
+      .select("id")
+      .eq("post_id", req.params.id)
+      .eq("user_id", req.user.id)
+      .single();
+
+    if (existing) {
+      await supabase.from("post_likes").delete().eq("id", existing.id);
+    } else {
+      await supabase
+        .from("post_likes")
+        .insert({ post_id: req.params.id, user_id: req.user.id });
+    }
+
+    const { count } = await supabase
+      .from("post_likes")
+      .select("id", { count: "exact", head: true })
+      .eq("post_id", req.params.id);
+
+    res.json({ liked: !existing, like_count: count || 0 });
+  } catch (error) {
+    console.error("Like toggle error:", error.message);
+    res.status(500).json({ error: "Failed to update like" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// COURSE ENROLLMENT & PROGRESS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/courses/:courseId/enroll
+ * Enrolls the current user in a course. Safe to call twice (no-op
+ * if already enrolled). Body: { title }
+ */
+app.post("/api/courses/:courseId/enroll", verifyToken, async (req, res) => {
+  try {
+    const { title } = req.body;
+    const { data: existing } = await supabase
+      .from("course_enrollments")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .eq("course_id", req.params.courseId)
+      .single();
+
+    if (existing) return res.json(existing);
+
+    const { data, error } = await supabase
+      .from("course_enrollments")
+      .insert({
+        user_id: req.user.id,
+        course_id: req.params.courseId,
+        course_title: title || req.params.courseId,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Enroll error:", error.message);
+    res.status(500).json({ error: "Failed to enroll in course" });
+  }
+});
+
+/**
+ * PUT /api/courses/:courseId/progress
+ * Updates progress for an existing enrollment.
+ * Body: { progress_percent, last_lesson_id }
+ */
+app.put("/api/courses/:courseId/progress", verifyToken, async (req, res) => {
+  try {
+    const { progress_percent, last_lesson_id } = req.body;
+    const update = {
+      progress_percent,
+      last_lesson_id,
+      ...(progress_percent >= 100 ? { completed_at: new Date().toISOString() } : {}),
+    };
+
+    const { data, error } = await supabase
+      .from("course_enrollments")
+      .update(update)
+      .eq("user_id", req.user.id)
+      .eq("course_id", req.params.courseId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "Not enrolled in this course yet" });
+
+    res.json(data);
+  } catch (error) {
+    console.error("Update progress error:", error.message);
+    res.status(500).json({ error: "Failed to update progress" });
+  }
+});
+
+/**
+ * GET /api/user/courses
+ * All courses the current user is enrolled in, most recent first.
+ * Used by the dashboard's "Course Progress" card and "My Courses" tab.
+ */
+app.get("/api/user/courses", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("course_enrollments")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("enrolled_at", { ascending: false });
+    if (error) throw error;
+
+    res.json(data);
+  } catch (error) {
+    console.error("Get user courses error:", error.message);
+    res.status(500).json({ error: "Failed to fetch your courses" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// THERAPY SESSIONS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/sessions/book
+ * Books a session with a provider. Requires login.
+ * Body: { providerId, providerName, scheduledAt (ISO string), mode, priceKes }
+ */
+app.post("/api/sessions/book", verifyToken, async (req, res) => {
+  try {
+    const { providerId, providerName, scheduledAt, mode, priceKes } = req.body;
+
+    if (!providerName || !scheduledAt) {
+      return res.status(400).json({ error: "providerName and scheduledAt are required" });
+    }
+
+    const { data, error } = await supabase
+      .from("therapy_sessions")
+      .insert({
+        user_id: req.user.id,
+        provider_id: providerId || null,
+        provider_name: providerName,
+        mode: mode === "in-person" ? "in-person" : "video",
+        price_kes: priceKes || null,
+        scheduled_at: scheduledAt,
+        status: "upcoming",
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Book session error:", error.message);
+    res.status(500).json({ error: "Failed to book session" });
+  }
+});
+
+/**
+ * GET /api/sessions/next
+ * The user's nearest upcoming session, or null if they have none.
+ */
+app.get("/api/sessions/next", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("therapy_sessions")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .eq("status", "upcoming")
+      .gte("scheduled_at", new Date().toISOString())
+      .order("scheduled_at", { ascending: true })
+      .limit(1);
+    if (error) throw error;
+
+    res.json(data[0] || null);
+  } catch (error) {
+    console.error("Get next session error:", error.message);
+    res.status(500).json({ error: "Failed to fetch next session" });
+  }
+});
+
+/**
+ * GET /api/sessions
+ * All of the user's sessions (for a future "My Sessions" tab).
+ */
+app.get("/api/sessions", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("therapy_sessions")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("scheduled_at", { ascending: false });
+    if (error) throw error;
+
+    res.json(data);
+  } catch (error) {
+    console.error("Get sessions error:", error.message);
+    res.status(500).json({ error: "Failed to fetch sessions" });
   }
 });
 

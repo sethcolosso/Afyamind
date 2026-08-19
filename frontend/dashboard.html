@@ -48,18 +48,18 @@
       <div class="dash-cards">
         <div class="dash-card">
           <div class="dash-card-label">Mood Streak</div>
-          <div class="dash-card-value" id="streak-value">7 days 🔥</div>
-          <div class="dash-card-sub">Keep it going!</div>
+          <div class="dash-card-value" id="streak-value">— 🔥</div>
+          <div class="dash-card-sub" id="streak-sub">Loading...</div>
         </div>
         <div class="dash-card">
           <div class="dash-card-label">Next Session</div>
-          <div class="dash-card-value" style="font-size:16px;">Dr. Amina Hassan</div>
-          <div class="dash-card-sub" style="color:var(--primary);font-weight:600;">Tomorrow 10:00 AM</div>
+          <div class="dash-card-value" id="session-value" style="font-size:16px;">Loading...</div>
+          <div class="dash-card-sub" id="session-sub" style="color:var(--primary);font-weight:600;"></div>
         </div>
         <div class="dash-card">
           <div class="dash-card-label">Course Progress</div>
-          <div class="dash-card-value" style="font-size:16px;">60%</div>
-          <div class="dash-card-sub">Managing Anxiety · Week 4</div>
+          <div class="dash-card-value" id="course-value" style="font-size:16px;">Loading...</div>
+          <div class="dash-card-sub" id="course-sub"></div>
         </div>
       </div>
 
@@ -68,22 +68,34 @@
         <h3>Today's Mood Check-In</h3>
         <p style="font-size:14px;color:var(--text-sec);margin-bottom:12px;">How are you feeling right now?</p>
         <div class="mood-check" id="mood-check">
-          <button class="mood-btn" data-mood="😔" onclick="logMood(this)">😔</button>
-          <button class="mood-btn" data-mood="😟" onclick="logMood(this)">😟</button>
-          <button class="mood-btn" data-mood="😐" onclick="logMood(this)">😐</button>
-          <button class="mood-btn" data-mood="🙂" onclick="logMood(this)">🙂</button>
-          <button class="mood-btn" data-mood="😊" onclick="logMood(this)">😊</button>
+          <button class="mood-btn" data-mood="😔" data-score="1" onclick="logMood(this)">😔</button>
+          <button class="mood-btn" data-mood="😟" data-score="2" onclick="logMood(this)">😟</button>
+          <button class="mood-btn" data-mood="😐" data-score="3" onclick="logMood(this)">😐</button>
+          <button class="mood-btn" data-mood="🙂" data-score="4" onclick="logMood(this)">🙂</button>
+          <button class="mood-btn" data-mood="😊" data-score="5" onclick="logMood(this)">😊</button>
         </div>
        <textarea id="mood-note" class="search-input" 
           placeholder="Write a note about how you're feeling today... (optional)" 
           rows="2" style="margin:15px 0; resize: vertical;"></textarea>
         <button class="btn btn-primary" onclick="saveMoodEntry()">Log Mood</button>
       </div>
+
+      <!-- My Groups (live) -->
+      <div class="dash-widget">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h3>My Groups</h3>
+          <span class="live-dot" id="groups-live-dot" title="Live"></span>
+        </div>
+        <div id="overview-my-groups" class="my-groups-list">
+          <p class="empty-hint">Loading your groups...</p>
+        </div>
+      </div>
     </div>
 
     <!-- MOOD TRACKER PANEL -->
     <div id="mood-tracker-panel" class="dash-full" style="display:none;">
       <h2>Mood Tracker</h2>
+      <p style="color:var(--text-sec);font-size:14px;margin-bottom:16px;" id="mood-tracker-streak-line">Loading streak...</p>
       <div class="mood-history">
         <h3>Recent Moods</h3>
         <table id="mood-table" style="width:100%; border-collapse:collapse;">
@@ -99,6 +111,37 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- MY SESSIONS PANEL -->
+    <div id="sessions-panel" class="dash-full" style="display:none;">
+      <h2>My Sessions</h2>
+      <div id="sessions-list" style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+        <p class="empty-hint">Loading...</p>
+      </div>
+      <a href="help.html" class="btn btn-primary" style="margin-top:16px;display:inline-block;text-decoration:none;">Find a therapist →</a>
+    </div>
+
+    <!-- MY COURSES PANEL -->
+    <div id="courses-panel" class="dash-full" style="display:none;">
+      <h2>My Courses</h2>
+      <div id="courses-list" style="margin-top:16px;display:flex;flex-direction:column;gap:12px;">
+        <p class="empty-hint">Loading...</p>
+      </div>
+      <a href="learn.html" class="btn btn-primary" style="margin-top:16px;display:inline-block;text-decoration:none;">Browse courses →</a>
+    </div>
+
+    <!-- COMMUNITY PANEL (live) -->
+    <div id="community-panel" class="dash-full" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h2>My Groups</h2>
+        <span class="live-dot" id="groups-live-dot-2" title="Live"></span>
+      </div>
+      <p style="color:var(--text-sec);font-size:14px;margin-bottom:16px;">Updates automatically when you join a new group.</p>
+      <div id="community-my-groups" class="my-groups-list">
+        <p class="empty-hint">Loading your groups...</p>
+      </div>
+      <a href="community.html" class="btn btn-primary" style="margin-top:16px;display:inline-block;text-decoration:none;">Browse all groups →</a>
     </div>
 
     <!-- SETTINGS PANEL -->
@@ -123,9 +166,35 @@
   </div>
 </div>
 
+<!-- Supabase client, used ONLY for Realtime (read-only, anon key — safe to expose) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js"></script>
 <script>
-let moods = JSON.parse(localStorage.getItem('userMoods')) || [];
+// ── Config ──────────────────────────────────────────────────
+const API_BASE = 'http://localhost:3001'; // change if your backend runs elsewhere
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';           // Supabase dashboard → Settings → API
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // the "anon public" key — NOT the service role key
+
+let myGroups = [];
+let sb = null;
+
+function getToken() { return localStorage.getItem('afya_token'); }
+
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`,
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed (${res.status})`);
+  }
+  return res.status === 204 ? null : res.json();
+}
 
 function checkAuth() {
   const token = localStorage.getItem('afya_token');
@@ -149,10 +218,19 @@ function loadUserData(user) {
 
 function switchTab(tabIndex) {
   document.querySelectorAll('.dash-full').forEach(panel => panel.style.display = 'none');
-  
+
   if (tabIndex === 1) {
     document.getElementById('mood-tracker-panel').style.display = 'block';
-    renderMoodTable();
+    loadMoodData();
+  } else if (tabIndex === 3) {
+    document.getElementById('sessions-panel').style.display = 'block';
+    loadAllSessions();
+  } else if (tabIndex === 5) {
+    document.getElementById('courses-panel').style.display = 'block';
+    loadAllCourses();
+  } else if (tabIndex === 6) {
+    document.getElementById('community-panel').style.display = 'block';
+    renderMyGroups('community-my-groups');
   } else if (tabIndex === 8) {
     document.getElementById('settings-panel').style.display = 'block';
   } else {
@@ -168,43 +246,183 @@ function logMood(btn) {
   btn.classList.add('selected');
 }
 
-function saveMoodEntry() {
+async function saveMoodEntry() {
   const selected = document.querySelector('.mood-btn.selected');
   if (!selected) {
     alert("Please select a mood");
     return;
   }
 
+  const score = Number(selected.dataset.score);
   const mood = selected.dataset.mood;
   const note = document.getElementById('mood-note').value.trim();
 
-  const entry = {
-    date: new Date().toLocaleDateString('en-GB'),
-    mood: mood,
-    note: note || "No note"
-  };
-
-  moods.unshift(entry);
-  localStorage.setItem('userMoods', JSON.stringify(moods));
-
-  alert("✅ Mood logged successfully!");
-  document.getElementById('mood-note').value = '';
-  renderMoodTable();
+  try {
+    await api('/api/mood/log', {
+      method: 'POST',
+      body: JSON.stringify({ score, label: mood, note })
+    });
+    alert("✅ Mood logged successfully!");
+    document.getElementById('mood-note').value = '';
+    selected.classList.remove('selected');
+    await loadMoodData();
+  } catch (err) {
+    alert(`Couldn't save mood: ${err.message}`);
+  }
 }
 
-function renderMoodTable() {
+// ── Mood: streak + table (real backend data) ─────────────────
+async function loadMoodData() {
+  try {
+    const [streakRes, logs] = await Promise.all([
+      api('/api/mood/streak'),
+      api('/api/mood/logs')
+    ]);
+    renderStreak(streakRes.streak);
+    renderMoodTable(logs);
+  } catch (err) {
+    console.error('Failed to load mood data:', err);
+    document.getElementById('streak-value').textContent = '—';
+    document.getElementById('streak-sub').textContent = "Couldn't load";
+  }
+}
+
+function renderStreak(streak) {
+  const valueEl = document.getElementById('streak-value');
+  const subEl = document.getElementById('streak-sub');
+  const lineEl = document.getElementById('mood-tracker-streak-line');
+
+  if (streak > 0) {
+    valueEl.textContent = `${streak} day${streak === 1 ? '' : 's'} 🔥`;
+    subEl.textContent = 'Keep it going!';
+    if (lineEl) lineEl.textContent = `You're on a ${streak}-day streak. Missing one day is okay — missing two resets it.`;
+  } else {
+    valueEl.textContent = '0 days';
+    subEl.textContent = 'Log today to start a streak';
+    if (lineEl) lineEl.textContent = "No active streak — log your mood today to start one.";
+  }
+}
+
+function renderMoodTable(logs) {
   const tbody = document.getElementById('mood-table-body');
+  if (!tbody) return;
   tbody.innerHTML = '';
 
-  moods.forEach(entry => {
+  if (!logs.length) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty-hint">No mood logs yet.</td></tr>`;
+    return;
+  }
+
+  logs.forEach(entry => {
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td>${entry.date}</td>
-      <td style="font-size:24px;">${entry.mood}</td>
-      <td>${entry.note}</td>
+      <td>${new Date(entry.created_at).toLocaleDateString('en-GB')}</td>
+      <td style="font-size:24px;">${entry.label || '—'}</td>
+      <td>${entry.note || 'No note'}</td>
     `;
     tbody.appendChild(row);
   });
+}
+
+// ── Sessions (real backend data) ──────────────────────────────
+async function loadNextSession() {
+  const valueEl = document.getElementById('session-value');
+  const subEl = document.getElementById('session-sub');
+  try {
+    const session = await api('/api/sessions/next');
+    if (!session) {
+      valueEl.textContent = 'No upcoming session';
+      subEl.textContent = '';
+      return;
+    }
+    valueEl.textContent = session.provider_name;
+    subEl.textContent = formatSessionTime(session.scheduled_at);
+  } catch (err) {
+    console.error('Failed to load next session:', err);
+    valueEl.textContent = 'No upcoming session';
+    subEl.textContent = '';
+  }
+}
+
+async function loadAllSessions() {
+  const container = document.getElementById('sessions-list');
+  container.innerHTML = '<p class="empty-hint">Loading...</p>';
+  try {
+    const sessions = await api('/api/sessions');
+    if (!sessions.length) {
+      container.innerHTML = '<p class="empty-hint">You have no sessions booked yet.</p>';
+      return;
+    }
+    container.innerHTML = sessions.map(s => `
+      <div class="session-item ${s.status}">
+        <div>
+          <div class="session-item-name">${s.provider_name}</div>
+          <div class="session-item-meta">${formatSessionTime(s.scheduled_at)} · ${s.mode === 'video' ? '💻 Video' : '📍 In-person'}</div>
+        </div>
+        <span class="session-status-badge ${s.status}">${s.status}</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<p class="empty-hint">Couldn't load sessions.</p>`;
+  }
+}
+
+function formatSessionTime(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const isTomorrow = d.toDateString() === new Date(now.getTime() + 86400000).toDateString();
+  const isToday = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return `Today at ${time}`;
+  if (isTomorrow) return `Tomorrow at ${time}`;
+  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${time}`;
+}
+
+// ── Courses (real backend data) ────────────────────────────────
+async function loadCourseCard() {
+  const valueEl = document.getElementById('course-value');
+  const subEl = document.getElementById('course-sub');
+  try {
+    const courses = await api('/api/user/courses');
+    if (!courses.length) {
+      valueEl.textContent = 'No course enrolled';
+      subEl.textContent = '';
+      return;
+    }
+    const c = courses[0];
+    valueEl.textContent = `${c.progress_percent || 0}%`;
+    subEl.textContent = c.course_title || c.course_id;
+  } catch (err) {
+    console.error('Failed to load courses:', err);
+    valueEl.textContent = 'No course enrolled';
+    subEl.textContent = '';
+  }
+}
+
+async function loadAllCourses() {
+  const container = document.getElementById('courses-list');
+  container.innerHTML = '<p class="empty-hint">Loading...</p>';
+  try {
+    const courses = await api('/api/user/courses');
+    if (!courses.length) {
+      container.innerHTML = '<p class="empty-hint">You haven\'t enrolled in any courses yet.</p>';
+      return;
+    }
+    container.innerHTML = courses.map(c => `
+      <div class="course-progress-item">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <strong>${c.course_title || c.course_id}</strong>
+          <span>${c.progress_percent || 0}%</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${c.progress_percent || 0}%"></div></div>
+        <a href="course-anxiety-depression.html" class="btn btn-secondary" style="margin-top:10px;font-size:13px;padding:7px 16px;text-decoration:none;display:inline-block;">
+          ${c.progress_percent >= 100 ? 'Review course' : 'Continue'} →
+        </a>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<p class="empty-hint">Couldn't load courses.</p>`;
+  }
 }
 
 function saveSettings() {
@@ -220,6 +438,63 @@ function saveSettings() {
   loadUserData(user);
 }
 
+// ── My Groups (live) ────────────────────────────────────────
+async function loadMyGroups() {
+  try {
+    myGroups = await api('/api/user/groups');
+  } catch (err) {
+    console.error('Failed to load groups:', err);
+    myGroups = [];
+  }
+  renderMyGroups('overview-my-groups');
+  renderMyGroups('community-my-groups');
+}
+
+function renderMyGroups(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  if (!myGroups.length) {
+    el.innerHTML = '<p class="empty-hint">You haven\'t joined any groups yet. <a href="community.html">Browse groups →</a></p>';
+    return;
+  }
+
+  el.innerHTML = myGroups.map(g => `
+    <a class="my-group-item" href="community.html">
+      <div class="group-icon" style="background:var(--primary-light);">${g.icon}</div>
+      <div>
+        <div class="group-name">${g.title}</div>
+        <div class="group-members">${g.views_count || 0} views · ${g.moderated ? 'Moderated' : 'Open'}</div>
+      </div>
+    </a>
+  `).join('');
+}
+
+// Realtime: refresh "My Groups" the instant this user joins a new group
+function initRealtime(userId) {
+  if (SUPABASE_URL.startsWith('YOUR_') || SUPABASE_ANON_KEY.startsWith('YOUR_')) {
+    console.warn('Realtime disabled: set SUPABASE_URL and SUPABASE_ANON_KEY in dashboard.html');
+    return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  sb.channel('group-members-changes')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'group_members', filter: `user_id=eq.${userId}` },
+      () => { loadMyGroups(); flashLiveDot(); }
+    )
+    .subscribe();
+}
+
+function flashLiveDot() {
+  ['groups-live-dot', 'groups-live-dot-2'].forEach(id => {
+    const dot = document.getElementById(id);
+    if (!dot) return;
+    dot.classList.add('pulse');
+    setTimeout(() => dot.classList.remove('pulse'), 1500);
+  });
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   const user = checkAuth();
@@ -231,8 +506,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadUserData(user);
   switchTab(0);
-  renderMoodTable();
+  loadMoodData();
+  loadNextSession();
+  loadCourseCard();
+  loadMyGroups();
+  if (user.id) initRealtime(user.id);
 });
 </script>
+
+<style>
+.my-groups-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.my-group-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px;
+  background: #faf7ec; text-decoration: none; color: inherit; transition: background 0.15s ease;
+}
+.my-group-item:hover { background: var(--primary-light, #dce8df); }
+.my-group-item .group-icon {
+  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+}
+.my-group-item .group-name { font-weight: 700; font-size: 13.5px; }
+.my-group-item .group-members { font-size: 11.5px; color: var(--text-sec); }
+.empty-hint { color: var(--text-sec, #5f5c50); font-size: 13.5px; font-style: italic; }
+
+.live-dot {
+  width: 9px; height: 9px; border-radius: 50%; background: #4c8b6a; display: inline-block;
+}
+.live-dot.pulse { animation: live-pulse 1.5s ease; }
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(76,139,106,0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(76,139,106,0); }
+  100% { box-shadow: 0 0 0 0 rgba(76,139,106,0); }
+}
+
+.session-item {
+  display: flex; align-items: center; justify-content: space-between; background: #faf7ec;
+  border-radius: 10px; padding: 12px 14px;
+}
+.session-item-name { font-weight: 700; font-size: 14px; }
+.session-item-meta { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+.session-status-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: capitalize; }
+.session-status-badge.upcoming { background: var(--primary-light, #dce8df); color: var(--primary, #5b7f6a); }
+.session-status-badge.completed { background: #e8e2cd; color: #5f5c50; }
+.session-status-badge.cancelled { background: #fdf1e8; color: #b6592e; }
+
+.course-progress-item { background: #faf7ec; border-radius: 12px; padding: 14px 16px; }
+.progress-track { background: #e8e2cd; height: 8px; border-radius: 999px; overflow: hidden; }
+.progress-fill { background: var(--primary, #5b7f6a); height: 100%; border-radius: 999px; transition: width .3s ease; }
+</style>
 </body>
 </html>

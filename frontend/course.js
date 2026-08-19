@@ -7,6 +7,7 @@
    ============================================================ */
 
 const COURSE_ID = 'anxiety-stress-v1';
+const COURSE_TITLE = 'Understanding & Managing Anxiety and Stress';
 const LS = {
   progress: `afyamind:${COURSE_ID}:progress`,
   triggerLog: `afyamind:${COURSE_ID}:triggerLog`,
@@ -15,6 +16,95 @@ const LS = {
   reflections: `afyamind:${COURSE_ID}:reflections`,
   lastLesson: `afyamind:${COURSE_ID}:lastLesson`,
 };
+
+/* ---------------- Enrollment (backend sync) ---------------- */
+const API_BASE = 'http://localhost:3001'; // change if your backend runs elsewhere
+let isEnrolled = false;
+
+function getToken() { return localStorage.getItem('afya_token'); }
+function isLoggedIn() { return !!getToken(); }
+
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed (${res.status})`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function checkEnrollment() {
+  const enrollBtn = document.getElementById('enroll-btn');
+  const enrolledBadge = document.getElementById('enrolled-badge');
+  if (!enrollBtn || !enrolledBadge) return;
+
+  if (!isLoggedIn()) {
+    enrollBtn.style.display = 'inline-flex';
+    enrollBtn.textContent = 'Log in to enroll';
+    enrollBtn.onclick = () => { window.location.href = 'login.html'; };
+    return;
+  }
+
+  try {
+    const courses = await api('/api/user/courses');
+    isEnrolled = courses.some(c => c.course_id === COURSE_ID);
+  } catch (err) {
+    console.error('Failed to check enrollment:', err);
+    isEnrolled = false;
+  }
+
+  if (isEnrolled) {
+    enrollBtn.style.display = 'none';
+    enrolledBadge.style.display = 'inline-flex';
+  } else {
+    enrollBtn.style.display = 'inline-flex';
+    enrolledBadge.style.display = 'none';
+    enrollBtn.textContent = '+ Enroll in this course';
+    enrollBtn.onclick = enrollInCourse;
+  }
+}
+
+async function enrollInCourse() {
+  const enrollBtn = document.getElementById('enroll-btn');
+  enrollBtn.disabled = true;
+  enrollBtn.textContent = 'Enrolling...';
+  try {
+    await api(`/api/courses/${COURSE_ID}/enroll`, {
+      method: 'POST',
+      body: JSON.stringify({ title: COURSE_TITLE })
+    });
+    isEnrolled = true;
+    await pushProgressToServer(); // sync whatever local progress already exists
+    document.getElementById('enroll-btn').style.display = 'none';
+    document.getElementById('enrolled-badge').style.display = 'inline-flex';
+  } catch (err) {
+    alert(`Couldn't enroll: ${err.message}`);
+    enrollBtn.disabled = false;
+    enrollBtn.textContent = '+ Enroll in this course';
+  }
+}
+
+async function pushProgressToServer() {
+  if (!isEnrolled || !isLoggedIn()) return;
+  try {
+    await api(`/api/courses/${COURSE_ID}/progress`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        progress_percent: Progress.percent(),
+        last_lesson_id: currentLessonId
+      })
+    });
+  } catch (err) {
+    console.error('Failed to sync progress:', err);
+  }
+}
 
 /* ---------------- Course content ---------------- */
 const COURSE = {
@@ -392,6 +482,7 @@ const Progress = {
     localStorage.setItem(LS.progress, JSON.stringify(p));
     renderSidebar();
     renderProgressBar();
+    pushProgressToServer();
   },
   allItemIds() {
     const ids = [];
@@ -1177,6 +1268,7 @@ function initCourse() {
   goTo(startId);
 
   document.getElementById('resume-btn')?.addEventListener('click', () => goTo(startId));
+  checkEnrollment();
 }
 
 document.addEventListener('DOMContentLoaded', initCourse);

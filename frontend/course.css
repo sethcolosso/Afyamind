@@ -42,6 +42,16 @@
 .course-hero-meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; opacity: .9; }
 .course-hero-meta span { display: flex; align-items: center; gap: 6px; }
 
+.enroll-btn {
+  margin-top: 18px; background: #fff; color: var(--c-primary, #5b7f6a); border: none; padding: 11px 22px;
+  border-radius: 999px; font-weight: 800; font-size: 13.5px; cursor: pointer; font-family: inherit;
+}
+.enroll-btn:hover { opacity: .92; }
+.enrolled-badge {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; background: rgba(255,255,255,.2);
+  border: 1px solid rgba(255,255,255,.4); padding: 9px 18px; border-radius: 999px; font-weight: 700; font-size: 13px;
+}
+
 .hero-progress-ring {
   width: 128px; height: 128px; position: relative; display: flex; align-items: center; justify-content: center;
   flex-direction: column; background: rgba(255,255,255,.14); border-radius: 50%; border: 6px solid rgba(255,255,255,.35);

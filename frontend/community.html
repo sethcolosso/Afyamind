@@ -17,7 +17,7 @@
   <!-- Sidebar -->
   <div class="groups-sidebar">
     <input class="search-input" placeholder="🔍 Find a group..." id="search-input">
-    
+
     <div style="margin:20px 0 10px;">
       <button class="btn btn-primary" onclick="createNewForum()" style="width:100%;">
         + Create New Forum
@@ -41,14 +41,18 @@
       <div style="display:flex;gap:8px;" id="header-actions"></div>
     </div>
 
-    <!-- Chat Messages -->
-    <div class="chat-messages" id="chat-messages">
-      <!-- Messages loaded by JS -->
+    <div id="login-banner" class="login-banner" style="display:none;">
+      👋 You're viewing as a guest. <a href="login.html">Log in</a> to post, comment, and like.
     </div>
 
-    <!-- Message Input -->
+    <!-- Posts -->
+    <div class="chat-messages" id="chat-messages">
+      <!-- Posts loaded by JS -->
+    </div>
+
+    <!-- Post Input -->
     <div class="chat-input-area" id="chat-input-area" style="display:none;">
-      <input type="text" id="message-input" placeholder="Write a message..." 
+      <input type="text" id="message-input" placeholder="Share something with the group..."
              onkeypress="if(event.key === 'Enter') sendMessage()">
       <button onclick="sendMessage()" class="btn btn-primary">Send</button>
     </div>
@@ -57,237 +61,291 @@
 
 <script src="common.js"></script>
 <script>
-// Data
-let forums = JSON.parse(localStorage.getItem('afyaForums')) || [
-  {
-    id: 1,
-    title: "Anxiety Support",
-    icon: "😰",
-    members: 2341,
-    moderated: true,
-    joined: true,
-    messages: [
-      { 
-        user: "Community Guide", 
-        text: "Welcome to Anxiety Support! This is a safe, anonymous space where you can share your experiences. Be respectful, supportive, and kind. 💚", 
-        time: "10:15",
-        reactions: { "❤️": 12, "👍": 8 }
-      },
-      { 
-        user: "Wanjiku", 
-        text: "I've been struggling with overthinking lately. Anyone else?", 
-        time: "10:20",
-        reactions: { "😢": 5 }
-      }
-    ]
-  },
-  {
-    id: 2,
-    title: "Depression Circle",
-    icon: "💙",
-    members: 1892,
-    moderated: false,
-    joined: false,
-    messages: []
-  },
-  {
-    id: 3,
-    title: "Women's Wellness",
-    icon: "🌸",
-    members: 3210,
-    moderated: true,
-    joined: false,
-    messages: []
-  }
-];
+// ── Config ──────────────────────────────────────────────────
+const API_BASE = 'http://localhost:3001'; // change if your backend runs elsewhere
 
-let currentForumId = null;
+let groups = [];
+let currentGroupId = null;
+let currentPosts = [];
+let openCommentsFor = null; // post id currently showing its comment thread
 
-// Render Groups (unchanged)
-function renderGroups() {
-  const myGroups = document.getElementById('my-groups');
-  const suggested = document.getElementById('suggested-groups');
-  
-  myGroups.innerHTML = '';
-  suggested.innerHTML = '';
-
-  forums.forEach(forum => {
-    const div = document.createElement('div');
-    div.className = `group-item ${currentForumId === forum.id ? 'active' : ''}`;
-    div.innerHTML = `
-      <div class="group-icon" style="background:var(--primary-light);">${forum.icon}</div>
-      <div>
-        <div class="group-name">${forum.title}</div>
-        <div class="group-members">${forum.members} members</div>
-      </div>
-      ${forum.joined ? '<div class="unread-badge">Joined</div>' : ''}
-    `;
-    div.onclick = () => openForum(forum.id);
-    
-    if (forum.joined) {
-      myGroups.appendChild(div);
-    } else {
-      suggested.appendChild(div);
-    }
-  });
+function getToken() { return localStorage.getItem('afya_token'); }
+function isLoggedIn() { return !!getToken(); }
+function authHeaders() {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
 }
 
-function openForum(forumId) {
-  currentForumId = forumId;
-  const forum = forums.find(f => f.id === forumId);
-  if (!forum) return;
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) }
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed (${res.status})`);
+  }
+  return res.status === 204 ? null : res.json();
+}
 
-  document.getElementById('group-title').textContent = forum.title;
-  document.getElementById('group-subtitle').textContent = `${forum.members} members · ${forum.moderated ? 'Moderated' : ''}`;
+function requireLogin(message) {
+  if (isLoggedIn()) return true;
+  if (confirm(`${message}\n\nLog in now?`)) window.location.href = 'login.html';
+  return false;
+}
 
-  const headerActions = document.getElementById('header-actions');
-  headerActions.innerHTML = forum.joined 
-    ? `<button class="btn btn-secondary" style="font-size:13px;padding:7px 16px;">Joined</button>`
-    : `<button class="btn btn-primary" onclick="joinForum(${forum.id})">Join Group</button>`;
-
-  renderMessages(forum);
-  document.getElementById('chat-input-area').style.display = forum.joined ? 'flex' : 'none';
+// ── Load & render groups ───────────────────────────────────
+async function loadGroups() {
+  try {
+    groups = await api('/api/groups');
+  } catch (err) {
+    console.error('Failed to load groups:', err);
+    groups = [];
+  }
   renderGroups();
 }
 
-function renderMessages(forum) {
+function renderGroups() {
+  const myGroups = document.getElementById('my-groups');
+  const suggested = document.getElementById('suggested-groups');
+  const query = document.getElementById('search-input').value.trim().toLowerCase();
+
+  myGroups.innerHTML = '';
+  suggested.innerHTML = '';
+
+  groups
+    .filter(g => !query || g.title.toLowerCase().includes(query))
+    .forEach(g => {
+      const div = document.createElement('div');
+      div.className = `group-item ${currentGroupId === g.id ? 'active' : ''}`;
+      div.innerHTML = `
+        <div class="group-icon" style="background:var(--primary-light);">${g.icon}</div>
+        <div>
+          <div class="group-name">${g.title}</div>
+          <div class="group-members">${g.member_count} members · ${g.views_count || 0} views</div>
+        </div>
+        ${g.joined ? '<div class="unread-badge">Joined</div>' : ''}
+      `;
+      div.onclick = () => openGroup(g.id);
+      (g.joined ? myGroups : suggested).appendChild(div);
+    });
+
+  if (!myGroups.children.length) myGroups.innerHTML = '<p class="empty-hint">No groups joined yet.</p>';
+}
+
+document.getElementById('search-input').addEventListener('input', renderGroups);
+
+// ── Open a group ────────────────────────────────────────────
+async function openGroup(groupId) {
+  currentGroupId = groupId;
+  const group = groups.find(g => g.id === groupId);
+  if (!group) return;
+
+  document.getElementById('group-title').textContent = group.title;
+  document.getElementById('group-subtitle').textContent =
+    `${group.member_count} members · ${group.views_count || 0} views · ${group.moderated ? 'Moderated' : 'Open'}`;
+
+  const headerActions = document.getElementById('header-actions');
+  if (!isLoggedIn()) {
+    headerActions.innerHTML = `<button class="btn btn-primary" onclick="requireLogin('Log in to join this group.')">Join Group</button>`;
+  } else if (group.joined) {
+    headerActions.innerHTML = `<button class="btn btn-secondary" style="font-size:13px;padding:7px 16px;" disabled>Joined</button>`;
+  } else {
+    headerActions.innerHTML = `<button class="btn btn-primary" onclick="joinGroup('${group.id}')">Join Group</button>`;
+  }
+
+  document.getElementById('login-banner').style.display = isLoggedIn() ? 'none' : 'flex';
+  document.getElementById('chat-input-area').style.display = (isLoggedIn() && group.joined) ? 'flex' : 'none';
+
+  // Count this as a view (fire-and-forget, works for guests too)
+  api(`/api/groups/${groupId}/view`, { method: 'POST' }).then(() => {
+    group.views_count = (group.views_count || 0) + 1;
+  }).catch(() => {});
+
+  await loadPosts(groupId);
+  renderGroups();
+}
+
+async function loadPosts(groupId) {
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = '<p class="empty-hint">Loading...</p>';
+  try {
+    currentPosts = await api(`/api/groups/${groupId}/posts`);
+  } catch (err) {
+    container.innerHTML = `<p class="empty-hint">Couldn't load posts: ${err.message}</p>`;
+    return;
+  }
+  renderPosts();
+}
+
+function renderPosts() {
   const container = document.getElementById('chat-messages');
   container.innerHTML = '';
 
-  forum.messages.forEach((msg, index) => {
+  if (!currentPosts.length) {
+    container.innerHTML = '<p class="empty-hint">No posts yet — be the first to share.</p>';
+    return;
+  }
+
+  currentPosts.forEach(post => {
     const div = document.createElement('div');
     div.className = 'feed-post';
-    
-    let reactionsHTML = '';
-    if (msg.reactions) {
-      reactionsHTML = Object.entries(msg.reactions).map(([emoji, count]) => `
-        <span class="reaction-item" onclick="addReaction(${forum.id}, ${index}, '${emoji}')">${emoji} <small>${count}</small></span>
-      `).join('');
-    }
-
     div.innerHTML = `
       <div class="post-header">
-        <div class="anon-avatar" style="background:var(--primary-light);">${msg.user === "Community Guide" ? "🌿" : "👤"}</div>
+        <div class="anon-avatar" style="background:var(--primary-light);">👤</div>
         <div>
-          <div class="post-author" style="color:var(--primary);">${msg.user}</div>
-          <div class="post-time">${msg.time}</div>
+          <div class="post-author" style="color:var(--primary);">${post.author_name}</div>
+          <div class="post-time">${new Date(post.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
         </div>
       </div>
-      <p class="post-text">${msg.text}</p>
-      
-      <!-- Reactions -->
+      <p class="post-text">${escapeHtml(post.text)}</p>
+
       <div class="reactions">
-        ${reactionsHTML}
-        <span class="reaction-item" onclick="addReaction(${forum.id}, ${index}, '❤️')">❤️</span>
-        <span class="reaction-item" onclick="addReaction(${forum.id}, ${index}, '👍')">👍</span>
-        <span class="reaction-item" onclick="addReaction(${forum.id}, ${index}, '😂')">😂</span>
-        <span class="reaction-item" onclick="addReaction(${forum.id}, ${index}, '😢')">😢</span>
-        <span class="reaction-item" onclick="addReaction(${forum.id}, ${index}, '👏')">👏</span>
+        <span class="reaction-item ${post.liked_by_me ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
+          ❤️ <small>${post.like_count}</small>
+        </span>
+        <span class="reaction-item" onclick="toggleComments('${post.id}')">
+          💬 <small>${post.comment_count}</small>
+        </span>
       </div>
+
+      <div class="comment-thread" id="comments-${post.id}" style="display:${openCommentsFor === post.id ? 'block' : 'none'};"></div>
     `;
     container.appendChild(div);
   });
-  
+
+  if (openCommentsFor) loadComments(openCommentsFor);
   container.scrollTop = container.scrollHeight;
 }
 
-function addReaction(forumId, msgIndex, emoji) {
-  const token = localStorage.getItem('afya_token');
-  if (!token) {
-    alert("Please login to react to posts");
-    return;
-  }
-
-  const forum = forums.find(f => f.id === forumId);
-  if (!forum || !forum.messages[msgIndex]) return;
-
-  if (!forum.messages[msgIndex].reactions) {
-    forum.messages[msgIndex].reactions = {};
-  }
-  
-  forum.messages[msgIndex].reactions[emoji] = (forum.messages[msgIndex].reactions[emoji] || 0) + 1;
-
-  localStorage.setItem('afyaForums', JSON.stringify(forums));
-  renderMessages(forum);
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
 
-function sendMessage() {
-  const token = localStorage.getItem('afya_token');
-  if (!token) {
-    alert("Please login to send messages");
-    return;
+// ── Join / Post / Like / Comment ───────────────────────────
+async function joinGroup(groupId) {
+  if (!requireLogin('Log in to join this group.')) return;
+  try {
+    await api(`/api/groups/${groupId}/join`, { method: 'POST' });
+    const group = groups.find(g => g.id === groupId);
+    group.joined = true;
+    group.member_count += 1;
+    openGroup(groupId);
+  } catch (err) {
+    alert(err.message);
   }
+}
 
+async function sendMessage() {
+  if (!requireLogin('Log in to post in this group.')) return;
   const input = document.getElementById('message-input');
   const text = input.value.trim();
-  if (!text || !currentForumId) return;
+  if (!text || !currentGroupId) return;
 
-  const forum = forums.find(f => f.id === currentForumId);
-  const user = JSON.parse(localStorage.getItem('afya_user') || '{}');
-
-  forum.messages.push({
-    user: user.name || "You",
-    text: text,
-    time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-    reactions: {}
-  });
-
-  localStorage.setItem('afyaForums', JSON.stringify(forums));
-  renderMessages(forum);
-  input.value = '';
+  try {
+    await api(`/api/groups/${currentGroupId}/posts`, {
+      method: 'POST',
+      body: JSON.stringify({ text })
+    });
+    input.value = '';
+    await loadPosts(currentGroupId);
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
-function joinForum(forumId) {
-  const token = localStorage.getItem('afya_token');
-  if (!token) {
-    alert("Please login to join groups");
-    window.location.href = 'login.html';
-    return;
+async function toggleLike(postId) {
+  if (!requireLogin('Log in to like posts.')) return;
+  try {
+    const result = await api(`/api/posts/${postId}/like`, { method: 'POST' });
+    const post = currentPosts.find(p => p.id === postId);
+    if (post) { post.liked_by_me = result.liked; post.like_count = result.like_count; }
+    renderPosts();
+  } catch (err) {
+    alert(err.message);
   }
-
-  const forum = forums.find(f => f.id === forumId);
-  if (forum) forum.joined = true;
-
-  localStorage.setItem('afyaForums', JSON.stringify(forums));
-  openForum(forumId);
 }
 
-function createNewForum() {
-  const token = localStorage.getItem('afya_token');
-  if (!token) {
-    alert("You must be logged in to create a forum");
-    window.location.href = 'login.html';
-    return;
+function toggleComments(postId) {
+  openCommentsFor = openCommentsFor === postId ? null : postId;
+  renderPosts();
+}
+
+async function loadComments(postId) {
+  const el = document.getElementById(`comments-${postId}`);
+  if (!el) return;
+  el.innerHTML = '<p class="empty-hint">Loading comments...</p>';
+  try {
+    const comments = await api(`/api/posts/${postId}/comments`);
+    el.innerHTML = `
+      ${comments.map(c => `
+        <div class="comment-item">
+          <strong>${c.author_name}</strong>
+          <span>${escapeHtml(c.text)}</span>
+        </div>`).join('') || '<p class="empty-hint">No comments yet.</p>'}
+      ${isLoggedIn() ? `
+        <div class="comment-input-row">
+          <input type="text" placeholder="Write a comment..." id="comment-input-${postId}"
+                 onkeypress="if(event.key === 'Enter') submitComment('${postId}')">
+          <button class="btn btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="submitComment('${postId}')">Reply</button>
+        </div>` : `<p class="empty-hint"><a href="login.html">Log in</a> to comment.</p>`}
+    `;
+  } catch (err) {
+    el.innerHTML = `<p class="empty-hint">Couldn't load comments.</p>`;
   }
+}
+
+async function submitComment(postId) {
+  const input = document.getElementById(`comment-input-${postId}`);
+  const text = input.value.trim();
+  if (!text) return;
+  try {
+    await api(`/api/posts/${postId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ text })
+    });
+    input.value = '';
+    const post = currentPosts.find(p => p.id === postId);
+    if (post) post.comment_count += 1;
+    await loadComments(postId);
+    renderPosts();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function createNewForum() {
+  if (!requireLogin('Log in to create a forum.')) return;
 
   const title = prompt("Enter new forum name:");
   if (!title) return;
 
-  const newForum = {
-    id: Date.now(),
-    title: title,
-    icon: "💬",
-    members: 1,
-    moderated: true,
-    joined: true,
-    messages: []
-  };
-
-  forums.unshift(newForum);
-  localStorage.setItem('afyaForums', JSON.stringify(forums));
-  renderGroups();
-  openForum(newForum.id);
+  try {
+    const group = await api('/api/groups', {
+      method: 'POST',
+      body: JSON.stringify({ title })
+    });
+    await loadGroups();
+    openGroup(group.id);
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
+// ── Initialize ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
   fetch('header.html').then(r => r.text()).then(html => {
     document.getElementById('header-container').innerHTML = html;
-  });
+  }).catch(() => {});
 
-  renderGroups();
-  const firstJoined = forums.find(f => f.joined);
-  if (firstJoined) openForum(firstJoined.id);
+  await loadGroups();
+  const firstJoined = groups.find(g => g.joined) || groups[0];
+  if (firstJoined) openGroup(firstJoined.id);
 });
 </script>
 
@@ -296,16 +354,45 @@ document.addEventListener('DOMContentLoaded', () => {
   margin-top: 12px;
   display: flex;
   gap: 16px;
-  font-size: 18px;
+  font-size: 16px;
 }
-
 .reaction-item {
   cursor: pointer;
   transition: transform 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
+.reaction-item:hover { transform: scale(1.15); }
+.reaction-item.liked { color: #d94f4f; font-weight: 700; }
 
-.reaction-item:hover {
-  transform: scale(1.3);
+.login-banner {
+  background: var(--primary-light, #dce8df);
+  color: var(--primary, #5b7f6a);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 6px;
+}
+.login-banner a { color: var(--primary, #5b7f6a); font-weight: 700; }
+
+.empty-hint { color: var(--text-sec, #5f5c50); font-size: 13.5px; font-style: italic; padding: 8px 0; }
+
+.comment-thread {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e8e2cd;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.comment-item { font-size: 13.5px; background: #faf7ec; border-radius: 8px; padding: 8px 12px; }
+.comment-item strong { margin-right: 6px; color: var(--primary, #5b7f6a); }
+.comment-input-row { display: flex; gap: 8px; margin-top: 4px; }
+.comment-input-row input {
+  flex: 1; border: 1px solid #e8e2cd; border-radius: 8px; padding: 7px 10px; font-size: 13.5px; font-family: inherit;
 }
 </style>
 </body>

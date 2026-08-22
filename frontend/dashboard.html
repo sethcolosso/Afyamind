@@ -90,6 +90,15 @@
           <p class="empty-hint">Loading your groups...</p>
         </div>
       </div>
+
+      <!-- Self-assessment teaser -->
+      <div class="dash-widget assessment-teaser">
+        <div>
+          <h3 style="margin-bottom:4px;">Not sure how you're really doing?</h3>
+          <p style="font-size:13.5px;color:var(--text-sec);margin:0;">Take a 2-minute mood or anxiety check-in for a clearer picture.</p>
+        </div>
+        <a href="assessments.html" class="btn btn-primary" style="text-decoration:none;white-space:nowrap;">Take assessment →</a>
+      </div>
     </div>
 
     <!-- MOOD TRACKER PANEL -->
@@ -129,6 +138,73 @@
         <p class="empty-hint">Loading...</p>
       </div>
       <a href="learn.html" class="btn btn-primary" style="margin-top:16px;display:inline-block;text-decoration:none;">Browse courses →</a>
+    </div>
+
+    <!-- ADDICTION SUPPORT PANEL -->
+    <div id="addiction-panel" class="dash-full" style="display:none;">
+      <h2>🌱 Addiction Support</h2>
+      <p style="color:var(--text-sec);font-size:14px;margin-bottom:16px;">A private space to track a recovery goal, log daily check-ins, and reach real support when you need it.</p>
+
+      <div id="addiction-no-goal" style="display:none;">
+        <div class="dash-widget">
+          <h3>Set a recovery goal</h3>
+          <div class="form-group">
+            <label>What are you working on?</label>
+            <select id="addiction-category" class="search-input">
+              <option value="alcohol">Alcohol</option>
+              <option value="drugs">Drugs</option>
+              <option value="gambling">Gambling / Betting</option>
+              <option value="screen_time">Screen time / Gaming</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Starting from</label>
+            <input type="date" id="addiction-start-date" class="search-input">
+          </div>
+          <div class="form-group">
+            <label>Notes (optional)</label>
+            <textarea id="addiction-notes" class="search-input" rows="2" placeholder="Anything you want to remind future-you"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="setAddictionGoal()">Start tracking</button>
+        </div>
+      </div>
+
+      <div id="addiction-has-goal" style="display:none;">
+        <div class="dash-cards">
+          <div class="dash-card">
+            <div class="dash-card-label">Days on track</div>
+            <div class="dash-card-value" id="addiction-days">0 🌱</div>
+            <div class="dash-card-sub" id="addiction-category-label"></div>
+          </div>
+        </div>
+
+        <div class="dash-widget">
+          <h3>Today's check-in</h3>
+          <p style="font-size:14px;color:var(--text-sec);margin-bottom:12px;">How strong are today's cravings?</p>
+          <div class="mood-check" id="craving-check">
+            <button class="mood-btn" data-score="1" onclick="selectCraving(this)">1</button>
+            <button class="mood-btn" data-score="2" onclick="selectCraving(this)">2</button>
+            <button class="mood-btn" data-score="3" onclick="selectCraving(this)">3</button>
+            <button class="mood-btn" data-score="4" onclick="selectCraving(this)">4</button>
+            <button class="mood-btn" data-score="5" onclick="selectCraving(this)">5</button>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;margin:14px 0;font-size:13.5px;">
+            <input type="checkbox" id="addiction-relapse"> I used today — and that's okay, let's keep going
+          </label>
+          <textarea id="addiction-note" class="search-input" rows="2" placeholder="Anything on your mind today? (optional)" style="margin-bottom:12px;"></textarea>
+          <button class="btn btn-primary" onclick="submitAddictionCheckin()">Log check-in</button>
+        </div>
+
+        <div class="dash-widget">
+          <h3>Support, any time</h3>
+          <div class="hotline-list">
+            <a href="tel:1192" class="hotline-item">📞 NACADA 24/7 Helpline — 1192 (toll-free)</a>
+            <a href="tel:0722178177" class="hotline-item">📞 Befrienders Kenya — 0722 178 177</a>
+          </div>
+          <a href="talk.html" class="btn btn-secondary" style="margin-top:12px;display:inline-block;text-decoration:none;">Talk to Afya AI →</a>
+        </div>
+      </div>
     </div>
 
     <!-- COMMUNITY PANEL (live) -->
@@ -231,6 +307,9 @@ function switchTab(tabIndex) {
   } else if (tabIndex === 6) {
     document.getElementById('community-panel').style.display = 'block';
     renderMyGroups('community-my-groups');
+  } else if (tabIndex === 7) {
+    document.getElementById('addiction-panel').style.display = 'block';
+    loadAddictionData();
   } else if (tabIndex === 8) {
     document.getElementById('settings-panel').style.display = 'block';
   } else {
@@ -425,6 +504,72 @@ async function loadAllCourses() {
   }
 }
 
+// ── Addiction Support ───────────────────────────────────────
+const CATEGORY_LABELS = { alcohol: 'Alcohol', drugs: 'Drugs', gambling: 'Gambling / Betting', screen_time: 'Screen time / Gaming', other: 'Other' };
+
+async function loadAddictionData() {
+  try {
+    const goal = await api('/api/addiction/goal');
+    if (!goal) {
+      document.getElementById('addiction-no-goal').style.display = 'block';
+      document.getElementById('addiction-has-goal').style.display = 'none';
+      document.getElementById('addiction-start-date').value = new Date().toISOString().slice(0, 10);
+      return;
+    }
+    document.getElementById('addiction-no-goal').style.display = 'none';
+    document.getElementById('addiction-has-goal').style.display = 'block';
+    document.getElementById('addiction-days').textContent = `${goal.days_on_track} 🌱`;
+    document.getElementById('addiction-category-label').textContent = CATEGORY_LABELS[goal.category] || goal.category;
+  } catch (err) {
+    console.error('Failed to load addiction goal:', err);
+  }
+}
+
+async function setAddictionGoal() {
+  const category = document.getElementById('addiction-category').value;
+  const start_date = document.getElementById('addiction-start-date').value;
+  const notes = document.getElementById('addiction-notes').value.trim();
+  if (!start_date) { alert('Please choose a start date.'); return; }
+
+  try {
+    await api('/api/addiction/goal', {
+      method: 'POST',
+      body: JSON.stringify({ category, start_date, notes })
+    });
+    await loadAddictionData();
+  } catch (err) {
+    alert(`Couldn't save goal: ${err.message}`);
+  }
+}
+
+function selectCraving(btn) {
+  document.querySelectorAll('#craving-check .mood-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+async function submitAddictionCheckin() {
+  const selected = document.querySelector('#craving-check .mood-btn.selected');
+  const craving_score = selected ? Number(selected.dataset.score) : null;
+  const used_substance = document.getElementById('addiction-relapse').checked;
+  const note = document.getElementById('addiction-note').value.trim();
+
+  try {
+    await api('/api/addiction/checkin', {
+      method: 'POST',
+      body: JSON.stringify({ craving_score, used_substance, note })
+    });
+    alert(used_substance
+      ? "✅ Logged. Thank you for being honest — your streak restarts today, and that's genuinely okay."
+      : "✅ Check-in logged. Keep going.");
+    document.getElementById('addiction-note').value = '';
+    document.getElementById('addiction-relapse').checked = false;
+    if (selected) selected.classList.remove('selected');
+    await loadAddictionData();
+  } catch (err) {
+    alert(`Couldn't save check-in: ${err.message}`);
+  }
+}
+
 function saveSettings() {
   const name = document.getElementById('settings-name').value.trim();
   const email = document.getElementById('settings-email').value.trim();
@@ -552,6 +697,13 @@ document.addEventListener('DOMContentLoaded', () => {
 .course-progress-item { background: #faf7ec; border-radius: 12px; padding: 14px 16px; }
 .progress-track { background: #e8e2cd; height: 8px; border-radius: 999px; overflow: hidden; }
 .progress-fill { background: var(--primary, #5b7f6a); height: 100%; border-radius: 999px; transition: width .3s ease; }
+
+.hotline-list { display: flex; flex-direction: column; gap: 8px; }
+.hotline-item {
+  background: #fdf1e8; border: 1px solid #f0c9a8; color: #8a4a1f; border-radius: 10px; padding: 10px 14px;
+  font-size: 13.5px; font-weight: 700; text-decoration: none; display: block;
+}
+.assessment-teaser { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 </style>
 </body>
 </html>

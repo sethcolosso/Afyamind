@@ -1181,6 +1181,248 @@ app.get("/api/sessions", verifyToken, async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// STRUCTURED SELF-ASSESSMENTS
+// ═══════════════════════════════════════════════════════════════
+
+// Each item scored 0 (not at all) – 3 (nearly every day).
+// Depression item index 8 (the 9th question) screens for self-harm
+// thoughts — same clinical purpose as PHQ-9's item 9, written in our
+// own words. ANY non-zero answer there sets flagged_risk = true.
+const ASSESSMENT_DEFS = {
+  depression: {
+    maxPerItem: 3,
+    selfHarmItemIndex: 8,
+    bands: [
+      { max: 4, label: "Minimal" },
+      { max: 9, label: "Mild" },
+      { max: 14, label: "Moderate" },
+      { max: 19, label: "Moderately severe" },
+      { max: 27, label: "Severe" },
+    ],
+  },
+  anxiety: {
+    maxPerItem: 3,
+    selfHarmItemIndex: null,
+    bands: [
+      { max: 4, label: "Minimal" },
+      { max: 9, label: "Mild" },
+      { max: 14, label: "Moderate" },
+      { max: 21, label: "Severe" },
+    ],
+  },
+};
+
+function severityFor(type, score) {
+  const band = ASSESSMENT_DEFS[type].bands.find((b) => score <= b.max);
+  return band ? band.label : "Severe";
+}
+
+/**
+ * POST /api/assessments
+ * Submit a completed assessment. Body: { type: 'depression'|'anxiety', answers: number[] }
+ * Score and severity are computed server-side (never trust client-sent scores).
+ */
+app.post("/api/assessments", verifyToken, async (req, res) => {
+  try {
+    const { type, answers } = req.body;
+    const def = ASSESSMENT_DEFS[type];
+    if (!def) return res.status(400).json({ error: "type must be 'depression' or 'anxiety'" });
+    if (!Array.isArray(answers) || answers.some((a) => a < 0 || a > def.maxPerItem)) {
+      return res.status(400).json({ error: "Invalid answers array" });
+    }
+
+    const score = answers.reduce((sum, a) => sum + a, 0);
+    const severity = severityFor(type, score);
+    const flagged_risk = def.selfHarmItemIndex != null && answers[def.selfHarmItemIndex] > 0;
+
+    const { data, error } = await supabase
+      .from("assessments")
+      .insert({ user_id: req.user.id, type, score, severity, answers, flagged_risk })
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Submit assessment error:", error.message);
+    res.status(500).json({ error: "Failed to save assessment" });
+  }
+});
+
+/**
+ * GET /api/assessments
+ * Full history, most recent first.
+ */
+app.get("/api/assessments", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("assessments")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    console.error("Get assessments error:", error.message);
+    res.status(500).json({ error: "Failed to fetch assessments" });
+  }
+});
+
+/**
+ * GET /api/assessments/latest
+ * Most recent depression + anxiety result (or null for either), for
+ * quick display on the dashboard.
+ */
+app.get("/api/assessments/latest", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("assessments")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    res.json({
+      depression: data.find((a) => a.type === "depression") || null,
+      anxiety: data.find((a) => a.type === "anxiety") || null,
+    });
+  } catch (error) {
+    console.error("Get latest assessments error:", error.message);
+    res.status(500).json({ error: "Failed to fetch latest assessments" });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ADDICTION SUPPORT
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/addiction/goal
+ * Sets (or replaces) the user's active recovery goal.
+ * Body: { category, start_date (YYYY-MM-DD), notes? }
+ */
+app.post("/api/addiction/goal", verifyToken, async (req, res) => {
+  try {
+    const { category, start_date, notes } = req.body;
+    if (!category || !start_date) {
+      return res.status(400).json({ error: "category and start_date are required" });
+    }
+
+    // Deactivate any previous active goal (a user works on one thing at a time)
+    await supabase
+      .from("addiction_goals")
+      .update({ active: false })
+      .eq("user_id", req.user.id)
+      .eq("active", true);
+
+    const { data, error } = await supabase
+      .from("addiction_goals")
+      .insert({ user_id: req.user.id, category, start_date, notes: notes || null })
+      .select()
+      .single();
+    if (error) throw error;
+
+    res.status(201).json(data);
+  } catch (error) {
+    console.error("Set addiction goal error:", error.message);
+    res.status(500).json({ error: "Failed to save goal" });
+  }
+});
+
+/**
+ * GET /api/addiction/goal
+ * The user's current active goal, with computed days-on-track, or null.
+ */
+app.get("/api/addiction/goal", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("addiction_goals")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) throw error;
+
+    const goal = data[0] || null;
+    if (!goal) return res.json(null);
+
+    const days = Math.floor((Date.now() - new Date(goal.start_date)) / 86400000);
+    res.json({ ...goal, days_on_track: Math.max(days, 0) });
+  } catch (error) {
+    console.error("Get addiction goal error:", error.message);
+    res.status(500).json({ error: "Failed to fetch goal" });
+  }
+});
+
+/**
+ * POST /api/addiction/checkin
+ * Logs a daily check-in against the active goal.
+ * Body: { craving_score (1-5), used_substance (bool), note? }
+ * A relapse (used_substance = true) compassionately resets the goal's
+ * start_date to today rather than deleting any history.
+ */
+app.post("/api/addiction/checkin", verifyToken, async (req, res) => {
+  try {
+    const { craving_score, used_substance, note } = req.body;
+
+    const { data: goalData } = await supabase
+      .from("addiction_goals")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .eq("active", true)
+      .limit(1);
+    const goal = goalData?.[0];
+    if (!goal) return res.status(400).json({ error: "Set a recovery goal before checking in" });
+
+    const { data: checkin, error } = await supabase
+      .from("addiction_checkins")
+      .insert({
+        user_id: req.user.id,
+        goal_id: goal.id,
+        craving_score: craving_score || null,
+        used_substance: !!used_substance,
+        note: note || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    if (used_substance) {
+      await supabase
+        .from("addiction_goals")
+        .update({ start_date: new Date().toISOString().slice(0, 10) })
+        .eq("id", goal.id);
+    }
+
+    res.status(201).json(checkin);
+  } catch (error) {
+    console.error("Addiction checkin error:", error.message);
+    res.status(500).json({ error: "Failed to save check-in" });
+  }
+});
+
+/**
+ * GET /api/addiction/checkins
+ * Check-in history for the active goal, most recent first.
+ */
+app.get("/api/addiction/checkins", verifyToken, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("addiction_checkins")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    console.error("Get checkins error:", error.message);
+    res.status(500).json({ error: "Failed to fetch check-ins" });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🌿 AfyaMind API running on port ${PORT}`);

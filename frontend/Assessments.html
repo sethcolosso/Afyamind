@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Assessment — AfyaMind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="assessments.css">
+</head>
+<body style="background:#d4cea5;">
+
+<div id="header-container"></div>
+
+<div class="assess-shell">
+  <!-- Picker -->
+  <div id="picker-view" class="assess-card">
+    <h1>Self-Assessment</h1>
+    <p class="assess-sub">A quick, private check-in on how you've been feeling over the last two weeks. This isn't a diagnosis — it's a starting point for understanding yourself better, and for knowing when it's worth talking to someone.</p>
+    <div class="picker-grid">
+      <button class="picker-card" onclick="startAssessment('depression')">
+        <div class="picker-icon">💙</div>
+        <div class="picker-title">Mood &amp; Depression Screening</div>
+        <div class="picker-desc">9 questions · about 2 minutes</div>
+      </button>
+      <button class="picker-card" onclick="startAssessment('anxiety')">
+        <div class="picker-icon">🌊</div>
+        <div class="picker-title">Anxiety Screening</div>
+        <div class="picker-desc">7 questions · about 2 minutes</div>
+      </button>
+    </div>
+    <p class="assess-disclaimer">These screenings are self-help tools, not a clinical diagnosis. If anything here concerns you, please talk to a doctor or therapist — <a href="help.html">you can find one here</a>.</p>
+  </div>
+
+  <!-- Questionnaire -->
+  <div id="quiz-view" class="assess-card" style="display:none;">
+    <div class="quiz-progress-track"><div class="quiz-progress-fill" id="quiz-progress-fill"></div></div>
+    <p class="quiz-step-label" id="quiz-step-label"></p>
+    <h2 id="quiz-question"></h2>
+    <div class="quiz-options" id="quiz-options"></div>
+    <div class="quiz-nav">
+      <button class="btn-ghost-a" id="quiz-back">← Back</button>
+      <span></span>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-view" class="assess-card" style="display:none;">
+    <div id="crisis-alert" class="crisis-alert" style="display:none;">
+      <h3>💛 Before anything else</h3>
+      <p>You indicated you've had thoughts of harming yourself or that you'd be better off gone. Please reach out right now — you don't have to carry this alone.</p>
+      <div class="crisis-numbers">
+        <a href="tel:0722178177">📞 Befrienders Kenya: 0722 178 177</a>
+        <a href="tel:1199">📞 Kenya Red Cross: 1199</a>
+      </div>
+      <p class="crisis-note-small">If you're in immediate danger, please go to your nearest emergency room or call emergency services now.</p>
+    </div>
+
+    <div class="result-score-ring">
+      <span id="result-score">0</span>
+      <small id="result-max">/ 27</small>
+    </div>
+    <h2 id="result-severity">—</h2>
+    <p class="result-summary" id="result-summary"></p>
+
+    <div class="result-recommend" id="result-recommend"></div>
+
+    <div class="quiz-nav" style="margin-top:24px;">
+      <button class="btn-ghost-a" onclick="backToPicker()">← Take another</button>
+      <a class="btn-primary-a" href="dashboard.html">Go to dashboard</a>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+// ── Config ──────────────────────────────────────────────────
+const API_BASE = 'http://localhost:3001';
+
+function getToken() { return localStorage.getItem('afya_token'); }
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed (${res.status})`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+// ── Original screening items (same clinical domains as standard
+// tools, written in our own words — not reproduced verbatim). ──
+const OPTIONS = ['Not at all', 'Several days', 'More than half the days', 'Nearly every day'];
+
+const QUESTIONNAIRES = {
+  depression: {
+    max: 27,
+    questions: [
+      "Little interest or pleasure in things you'd usually enjoy",
+      "Feeling down, low, or hopeless",
+      "Trouble falling asleep, staying asleep, or sleeping too much",
+      "Feeling tired or having little energy",
+      "Poor appetite, or eating much more than usual",
+      "Feeling bad about yourself, or that you've let yourself or your family down",
+      "Trouble concentrating on things like reading or conversations",
+      "Moving or speaking noticeably slower than usual — or the opposite, feeling restless and fidgety",
+      "Thoughts that you'd be better off not here, or of hurting yourself in some way",
+    ],
+  },
+  anxiety: {
+    max: 21,
+    questions: [
+      "Feeling nervous, on edge, or unable to relax",
+      "Not being able to stop or control worrying",
+      "Worrying too much about different things",
+      "Trouble relaxing or sitting still",
+      "Becoming easily annoyed or irritable",
+      "Feeling restless, like you have to keep moving",
+      "Feeling as though something awful might happen",
+    ],
+  },
+};
+
+let currentType = null;
+let currentIndex = 0;
+let answers = [];
+
+function startAssessment(type) {
+  currentType = type;
+  currentIndex = 0;
+  answers = new Array(QUESTIONNAIRES[type].questions.length).fill(null);
+  document.getElementById('picker-view').style.display = 'none';
+  document.getElementById('results-view').style.display = 'none';
+  document.getElementById('quiz-view').style.display = 'block';
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = QUESTIONNAIRES[currentType];
+  const total = q.questions.length;
+  document.getElementById('quiz-progress-fill').style.width = `${(currentIndex / total) * 100}%`;
+  document.getElementById('quiz-step-label').textContent = `Question ${currentIndex + 1} of ${total} · Over the last 2 weeks`;
+  document.getElementById('quiz-question').textContent = q.questions[currentIndex];
+
+  const optionsEl = document.getElementById('quiz-options');
+  optionsEl.innerHTML = OPTIONS.map((label, val) => `
+    <button class="quiz-option ${answers[currentIndex] === val ? 'selected' : ''}" onclick="selectAnswer(${val})">
+      ${label}
+    </button>
+  `).join('');
+
+  document.getElementById('quiz-back').style.visibility = currentIndex === 0 ? 'hidden' : 'visible';
+}
+
+function selectAnswer(val) {
+  answers[currentIndex] = val;
+  const q = QUESTIONNAIRES[currentType];
+  if (currentIndex < q.questions.length - 1) {
+    currentIndex++;
+    renderQuestion();
+  } else {
+    submitAssessment();
+  }
+}
+
+document.getElementById('quiz-back').addEventListener('click', () => {
+  if (currentIndex > 0) { currentIndex--; renderQuestion(); }
+});
+
+async function submitAssessment() {
+  if (!getToken()) {
+    if (confirm('Log in to save your results and get personalized suggestions.\n\nLog in now?')) {
+      window.location.href = 'login.html';
+    }
+    return;
+  }
+  try {
+    const result = await api('/api/assessments', {
+      method: 'POST',
+      body: JSON.stringify({ type: currentType, answers })
+    });
+    showResults(result);
+  } catch (err) {
+    alert(`Couldn't save your assessment: ${err.message}`);
+  }
+}
+
+function showResults(result) {
+  document.getElementById('quiz-view').style.display = 'none';
+  document.getElementById('results-view').style.display = 'block';
+
+  document.getElementById('crisis-alert').style.display = result.flagged_risk ? 'block' : 'none';
+  document.getElementById('result-score').textContent = result.score;
+  document.getElementById('result-max').textContent = `/ ${QUESTIONNAIRES[result.type].max}`;
+  document.getElementById('result-severity').textContent = `${result.severity} ${result.type === 'depression' ? 'mood symptoms' : 'anxiety'}`;
+
+  const summaries = {
+    Minimal: "What you're describing sounds manageable right now. Keep up whatever's been working for you.",
+    Mild: "You're carrying a bit more than usual right now. Small daily tools — mood tracking, breathing exercises — can genuinely help here.",
+    Moderate: "What you're experiencing is significant enough that extra support would likely help. Consider exploring our courses or talking to a provider.",
+    "Moderately severe": "This is a meaningful amount to carry. Speaking with a mental health professional is a strong next step.",
+    Severe: "This sounds really hard right now. Please consider reaching out to a professional soon — you don't have to manage this alone.",
+  };
+  document.getElementById('result-summary').textContent = summaries[result.severity] || '';
+
+  const recommendEl = document.getElementById('result-recommend');
+  if (['Moderate', 'Moderately severe', 'Severe'].includes(result.severity)) {
+    recommendEl.innerHTML = `<a href="help.html" class="btn-primary-a" style="text-decoration:none;">Find a therapist →</a>`;
+  } else {
+    recommendEl.innerHTML = `<a href="learn.html" class="btn-primary-a" style="text-decoration:none;">Explore self-help courses →</a>`;
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function backToPicker() {
+  document.getElementById('results-view').style.display = 'none';
+  document.getElementById('picker-view').style.display = 'block';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('header.html').then(r => r.text()).then(html => {
+    document.getElementById('header-container').innerHTML = html;
+  }).catch(() => {});
+});
+</script>
+</body>
+</html>

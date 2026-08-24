@@ -74,6 +74,55 @@
 <div class="crisis-banner">
   In crisis right now? You are not alone. <a onclick="openCrisis()">Get immediate help →</a>
 </div>
+
+<!-- SELF-ASSESSMENTS -->
+<section class="assess-promo">
+  <div class="container">
+    <div style="text-align:center;">
+      <div class="assess-promo-badge">🧭 Free · Private · No account needed</div>
+      <h2 class="section-heading" style="color:#fff;">Check in with yourself</h2>
+      <p class="section-sub" style="color:rgba(255,255,255,.9);max-width:600px;margin:0 auto;">
+        Six quick, 2-minute screenings — mood, anxiety, stress, sleep, burnout, and self-esteem. Anyone can take one, right now.
+      </p>
+    </div>
+    <div class="assess-promo-grid">
+      <a class="assess-promo-card" style="--accent:#4f83cc;--accent-light:#e5eefc;" href="assessments.html?type=depression">
+        <div class="assess-promo-icon">💙</div>
+        <div class="assess-promo-title">Mood &amp; Depression</div>
+        <div class="assess-promo-time">9 questions · 2 min</div>
+      </a>
+      <a class="assess-promo-card" style="--accent:#2ba7a0;--accent-light:#e2f5f3;" href="assessments.html?type=anxiety">
+        <div class="assess-promo-icon">🌊</div>
+        <div class="assess-promo-title">Anxiety</div>
+        <div class="assess-promo-time">7 questions · 2 min</div>
+      </a>
+      <a class="assess-promo-card" style="--accent:#e07a3f;--accent-light:#fdece0;" href="assessments.html?type=stress">
+        <div class="assess-promo-icon">🔥</div>
+        <div class="assess-promo-title">Stress</div>
+        <div class="assess-promo-time">10 questions · 2 min</div>
+      </a>
+      <a class="assess-promo-card" style="--accent:#6a5acd;--accent-light:#ece9fb;" href="assessments.html?type=sleep">
+        <div class="assess-promo-icon">🌙</div>
+        <div class="assess-promo-title">Sleep Quality</div>
+        <div class="assess-promo-time">7 questions · 2 min</div>
+      </a>
+      <a class="assess-promo-card" style="--accent:#c0455e;--accent-light:#fbe4e8;" href="assessments.html?type=burnout">
+        <div class="assess-promo-icon">🕯️</div>
+        <div class="assess-promo-title">Burnout</div>
+        <div class="assess-promo-time">7 questions · 2 min</div>
+      </a>
+      <a class="assess-promo-card" style="--accent:#d1618f;--accent-light:#fce7ef;" href="assessments.html?type=self_esteem">
+        <div class="assess-promo-icon">🌸</div>
+        <div class="assess-promo-title">Self-Esteem</div>
+        <div class="assess-promo-time">8 questions · 2 min</div>
+      </a>
+    </div>
+    <div style="text-align:center;margin-top:28px;">
+      <a href="assessments.html" class="btn btn-primary btn-lg" style="text-decoration:none;display:inline-block;">See all assessments →</a>
+    </div>
+  </div>
+</section>
+
 <!-- HOW IT WORKS -->
 <section id="how-it-works" style="padding: 100px 0; background: #f8fafc;">
   <div class="container">
@@ -232,6 +281,44 @@
   </div>
   <div style="height:20px;"></div>
 </footer>
+
+<style>
+.assess-promo {
+  background: linear-gradient(135deg, #6a5acd 0%, #2ba7a0 50%, #e07a3f 100%);
+  background-size: 200% 200%;
+  animation: assess-gradient-shift 12s ease infinite;
+  padding: 80px 0;
+}
+@keyframes assess-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.assess-promo-badge {
+  display: inline-block; background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.35);
+  padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: #fff; margin-bottom: 14px;
+}
+.assess-promo-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 900px; margin: 3rem auto 0;
+}
+@media (max-width: 720px) { .assess-promo-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .assess-promo-grid { grid-template-columns: 1fr; } }
+
+.assess-promo-card {
+  --accent: #5b7f6a; --accent-light: #dce8df;
+  background: var(--accent-light); border-radius: 16px; padding: 22px 18px; text-decoration: none;
+  display: block; box-shadow: 0 8px 20px rgba(0,0,0,.12);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.assess-promo-card:hover { transform: translateY(-5px) scale(1.02); box-shadow: 0 14px 30px rgba(0,0,0,.18); }
+.assess-promo-icon {
+  font-size: 26px; width: 46px; height: 46px; border-radius: 50%; background: #fff; display: flex;
+  align-items: center; justify-content: center; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,.08);
+}
+.assess-promo-title { font-weight: 800; font-size: 15px; color: #241c14; margin-bottom: 4px; }
+.assess-promo-time { font-size: 12px; font-weight: 700; color: var(--accent); }
+</style>
+
 <script src="common.js"></script>
 <script>
   function updateFeatureCards() {

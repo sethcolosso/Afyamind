@@ -1185,10 +1185,11 @@ app.get("/api/sessions", verifyToken, async (req, res) => {
 // STRUCTURED SELF-ASSESSMENTS
 // ═══════════════════════════════════════════════════════════════
 
-// Each item scored 0 (not at all) – 3 (nearly every day).
-// Depression item index 8 (the 9th question) screens for self-harm
-// thoughts — same clinical purpose as PHQ-9's item 9, written in our
-// own words. ANY non-zero answer there sets flagged_risk = true.
+// Each item scored 0 (not at all) – 3 (nearly every day), unless
+// noted otherwise. Depression item index 8 (the 9th question)
+// screens for self-harm thoughts — same clinical purpose as PHQ-9's
+// item 9, written in our own words. ANY non-zero answer there sets
+// flagged_risk = true.
 const ASSESSMENT_DEFS = {
   depression: {
     maxPerItem: 3,
@@ -1211,6 +1212,46 @@ const ASSESSMENT_DEFS = {
       { max: 21, label: "Severe" },
     ],
   },
+  stress: {
+    maxPerItem: 3,
+    selfHarmItemIndex: null,
+    bands: [
+      { max: 9, label: "Low" },
+      { max: 16, label: "Moderate" },
+      { max: 23, label: "High" },
+      { max: 30, label: "Very high" },
+    ],
+  },
+  sleep: {
+    maxPerItem: 3,
+    selfHarmItemIndex: null,
+    bands: [
+      { max: 4, label: "Good" },
+      { max: 9, label: "Mild difficulty" },
+      { max: 15, label: "Moderate difficulty" },
+      { max: 21, label: "Significant difficulty" },
+    ],
+  },
+  burnout: {
+    maxPerItem: 3,
+    selfHarmItemIndex: null,
+    bands: [
+      { max: 4, label: "Low" },
+      { max: 9, label: "Mild" },
+      { max: 15, label: "Moderate" },
+      { max: 21, label: "High" },
+    ],
+  },
+  self_esteem: {
+    maxPerItem: 3,
+    selfHarmItemIndex: null,
+    bands: [
+      { max: 6, label: "Strong" },
+      { max: 12, label: "Mild self-doubt" },
+      { max: 18, label: "Moderate self-doubt" },
+      { max: 24, label: "Significant self-doubt" },
+    ],
+  },
 };
 
 function severityFor(type, score) {
@@ -1227,7 +1268,7 @@ app.post("/api/assessments", verifyToken, async (req, res) => {
   try {
     const { type, answers } = req.body;
     const def = ASSESSMENT_DEFS[type];
-    if (!def) return res.status(400).json({ error: "type must be 'depression' or 'anxiety'" });
+    if (!def) return res.status(400).json({ error: "Unknown assessment type" });
     if (!Array.isArray(answers) || answers.some((a) => a < 0 || a > def.maxPerItem)) {
       return res.status(400).json({ error: "Invalid answers array" });
     }
@@ -1247,6 +1288,32 @@ app.post("/api/assessments", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("Submit assessment error:", error.message);
     res.status(500).json({ error: "Failed to save assessment" });
+  }
+});
+
+/**
+ * POST /api/assessments/anon
+ * Scores an assessment WITHOUT saving it or requiring login — used
+ * on the homepage so anyone can take an assessment. Same scoring
+ * logic as the authenticated endpoint, just nothing persisted.
+ */
+app.post("/api/assessments/anon", async (req, res) => {
+  try {
+    const { type, answers } = req.body;
+    const def = ASSESSMENT_DEFS[type];
+    if (!def) return res.status(400).json({ error: "Unknown assessment type" });
+    if (!Array.isArray(answers) || answers.some((a) => a < 0 || a > def.maxPerItem)) {
+      return res.status(400).json({ error: "Invalid answers array" });
+    }
+
+    const score = answers.reduce((sum, a) => sum + a, 0);
+    const severity = severityFor(type, score);
+    const flagged_risk = def.selfHarmItemIndex != null && answers[def.selfHarmItemIndex] > 0;
+
+    res.json({ type, score, severity, flagged_risk, saved: false });
+  } catch (error) {
+    console.error("Anon assessment error:", error.message);
+    res.status(500).json({ error: "Failed to score assessment" });
   }
 });
 

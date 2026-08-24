@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Self-Assessment — AfyaMind</title>
+<title>Self-Assessments — AfyaMind</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -14,23 +14,18 @@
 
 <div id="header-container"></div>
 
+<div class="assess-hero">
+  <div class="assess-hero-inner">
+    <span class="assess-hero-badge">🧭 Free · Private · 2 minutes each</span>
+    <h1>Check in with yourself</h1>
+    <p>Six quick, well-researched-style screenings covering mood, anxiety, stress, sleep, burnout, and self-esteem. No account needed to try one — log in if you'd like your results saved and tracked over time.</p>
+  </div>
+</div>
+
 <div class="assess-shell">
   <!-- Picker -->
-  <div id="picker-view" class="assess-card">
-    <h1>Self-Assessment</h1>
-    <p class="assess-sub">A quick, private check-in on how you've been feeling over the last two weeks. This isn't a diagnosis — it's a starting point for understanding yourself better, and for knowing when it's worth talking to someone.</p>
-    <div class="picker-grid">
-      <button class="picker-card" onclick="startAssessment('depression')">
-        <div class="picker-icon">💙</div>
-        <div class="picker-title">Mood &amp; Depression Screening</div>
-        <div class="picker-desc">9 questions · about 2 minutes</div>
-      </button>
-      <button class="picker-card" onclick="startAssessment('anxiety')">
-        <div class="picker-icon">🌊</div>
-        <div class="picker-title">Anxiety Screening</div>
-        <div class="picker-desc">7 questions · about 2 minutes</div>
-      </button>
-    </div>
+  <div id="picker-view">
+    <div class="picker-grid" id="picker-grid"><!-- rendered by JS --></div>
     <p class="assess-disclaimer">These screenings are self-help tools, not a clinical diagnosis. If anything here concerns you, please talk to a doctor or therapist — <a href="help.html">you can find one here</a>.</p>
   </div>
 
@@ -38,11 +33,11 @@
   <div id="quiz-view" class="assess-card" style="display:none;">
     <div class="quiz-progress-track"><div class="quiz-progress-fill" id="quiz-progress-fill"></div></div>
     <p class="quiz-step-label" id="quiz-step-label"></p>
-    <h2 id="quiz-question"></h2>
+    <h2 id="quiz-question" class="quiz-question-anim"></h2>
     <div class="quiz-options" id="quiz-options"></div>
     <div class="quiz-nav">
       <button class="btn-ghost-a" id="quiz-back">← Back</button>
-      <span></span>
+      <button class="btn-ghost-a" onclick="backToPicker()">Cancel</button>
     </div>
   </div>
 
@@ -58,18 +53,28 @@
       <p class="crisis-note-small">If you're in immediate danger, please go to your nearest emergency room or call emergency services now.</p>
     </div>
 
-    <div class="result-score-ring">
-      <span id="result-score">0</span>
-      <small id="result-max">/ 27</small>
+    <div class="result-score-ring" id="result-ring">
+      <svg viewBox="0 0 120 120" class="result-ring-svg">
+        <circle cx="60" cy="60" r="52" class="ring-track"></circle>
+        <circle cx="60" cy="60" r="52" class="ring-fill" id="result-ring-fill"></circle>
+      </svg>
+      <div class="result-ring-label">
+        <span id="result-score">0</span>
+        <small id="result-max">/ 27</small>
+      </div>
     </div>
     <h2 id="result-severity">—</h2>
     <p class="result-summary" id="result-summary"></p>
+
+    <div id="save-banner" class="save-banner" style="display:none;">
+      🔒 <a href="login.html">Log in</a> to save this result and track it over time.
+    </div>
 
     <div class="result-recommend" id="result-recommend"></div>
 
     <div class="quiz-nav" style="margin-top:24px;">
       <button class="btn-ghost-a" onclick="backToPicker()">← Take another</button>
-      <a class="btn-primary-a" href="dashboard.html">Go to dashboard</a>
+      <a class="btn-primary-a" id="dashboard-link" href="dashboard.html">Go to dashboard</a>
     </div>
   </div>
 </div>
@@ -96,13 +101,18 @@ async function api(path, options = {}) {
   return res.status === 204 ? null : res.json();
 }
 
-// ── Original screening items (same clinical domains as standard
-// tools, written in our own words — not reproduced verbatim). ──
-const OPTIONS = ['Not at all', 'Several days', 'More than half the days', 'Nearly every day'];
+// ── Assessment definitions (mirrors server.js scoring bands) ──
+// Original wording throughout — screens for the same well-established
+// clinical domains as standard tools, without reproducing them verbatim.
+const FREQ_OPTIONS = ['Not at all', 'Several days', 'More than half the days', 'Nearly every day'];
+const AGREE_OPTIONS = ['Strongly disagree', 'Disagree', 'Agree', 'Strongly agree'];
 
-const QUESTIONNAIRES = {
+const ASSESSMENTS = {
   depression: {
-    max: 27,
+    label: 'Mood & Depression', icon: '💙', color: '#4f83cc', colorLight: '#e5eefc',
+    tagline: 'How your mood has been lately', time: '9 questions · 2 min',
+    options: FREQ_OPTIONS, max: 27, selfHarmIndex: 8,
+    bands: [[4,'Minimal'],[9,'Mild'],[14,'Moderate'],[19,'Moderately severe'],[27,'Severe']],
     questions: [
       "Little interest or pleasure in things you'd usually enjoy",
       "Feeling down, low, or hopeless",
@@ -116,7 +126,10 @@ const QUESTIONNAIRES = {
     ],
   },
   anxiety: {
-    max: 21,
+    label: 'Anxiety', icon: '🌊', color: '#2ba7a0', colorLight: '#e2f5f3',
+    tagline: 'How much worry has been showing up', time: '7 questions · 2 min',
+    options: FREQ_OPTIONS, max: 21, selfHarmIndex: null,
+    bands: [[4,'Minimal'],[9,'Mild'],[14,'Moderate'],[21,'Severe']],
     questions: [
       "Feeling nervous, on edge, or unable to relax",
       "Not being able to stop or control worrying",
@@ -127,7 +140,89 @@ const QUESTIONNAIRES = {
       "Feeling as though something awful might happen",
     ],
   },
+  stress: {
+    label: 'Stress', icon: '🔥', color: '#e07a3f', colorLight: '#fdece0',
+    tagline: 'How overloaded life feels right now', time: '10 questions · 2 min',
+    options: FREQ_OPTIONS, max: 30, selfHarmIndex: null,
+    bands: [[9,'Low'],[16,'Moderate'],[23,'High'],[30,'Very high']],
+    questions: [
+      "Felt like things were piling up faster than you could handle",
+      "Felt unable to control the important things in your life",
+      "Felt nervous or \"stressed\"",
+      "Felt overwhelmed by your responsibilities",
+      "Had trouble relaxing even when you had free time",
+      "Felt physically tense — tight shoulders, clenched jaw, headaches",
+      "Felt irritable or short-tempered over small things",
+      "Found it hard to switch off your mind at the end of the day",
+      "Felt like you were constantly rushing",
+      "Felt like stress was affecting your relationships or work",
+    ],
+  },
+  sleep: {
+    label: 'Sleep Quality', icon: '🌙', color: '#6a5acd', colorLight: '#ece9fb',
+    tagline: 'How rested you actually feel', time: '7 questions · 2 min',
+    options: FREQ_OPTIONS, max: 21, selfHarmIndex: null,
+    bands: [[4,'Good'],[9,'Mild difficulty'],[15,'Moderate difficulty'],[21,'Significant difficulty']],
+    questions: [
+      "Took a long time to fall asleep",
+      "Woke up during the night and struggled to fall back asleep",
+      "Woke up earlier than you wanted to",
+      "Felt tired or unrested during the day",
+      "Relied on caffeine to get through the day",
+      "Worried about sleep before bed",
+      "Used screens right before trying to sleep",
+    ],
+  },
+  burnout: {
+    label: 'Burnout', icon: '🕯️', color: '#c0455e', colorLight: '#fbe4e8',
+    tagline: 'How depleted you feel by daily life', time: '7 questions · 2 min',
+    options: FREQ_OPTIONS, max: 21, selfHarmIndex: null,
+    bands: [[4,'Low'],[9,'Mild'],[15,'Moderate'],[21,'High']],
+    questions: [
+      "Felt emotionally drained by your daily responsibilities",
+      "Felt cynical or detached about work, school, or family duties",
+      "Felt like nothing you do makes much difference",
+      "Felt exhausted even after resting",
+      "Dreaded starting your day",
+      "Felt less effective or capable than you used to",
+      "Felt disconnected from people you used to enjoy being around",
+    ],
+  },
+  self_esteem: {
+    label: 'Self-Esteem', icon: '🌸', color: '#d1618f', colorLight: '#fce7ef',
+    tagline: "How you've been talking to yourself", time: '8 questions · 2 min',
+    options: AGREE_OPTIONS, max: 24, selfHarmIndex: null,
+    bands: [[6,'Strong'],[12,'Mild self-doubt'],[18,'Moderate self-doubt'],[24,'Significant self-doubt']],
+    questions: [
+      "I often feel like I'm not good enough",
+      "I find it hard to accept compliments",
+      "I compare myself unfavorably to others",
+      "I doubt my own decisions",
+      "I feel like others are more capable than me",
+      "I struggle to recognize my own achievements",
+      "I feel uncomfortable being noticed because I doubt myself",
+      "I often feel like a disappointment",
+    ],
+  },
 };
+
+function severityFor(type, score) {
+  const band = ASSESSMENTS[type].bands.find(([max]) => score <= max);
+  return band ? band[1] : ASSESSMENTS[type].bands[ASSESSMENTS[type].bands.length - 1][1];
+}
+
+// ── Picker ──────────────────────────────────────────────────
+function renderPicker() {
+  const grid = document.getElementById('picker-grid');
+  grid.innerHTML = Object.entries(ASSESSMENTS).map(([key, a]) => `
+    <button class="picker-card" style="--accent:${a.color};--accent-light:${a.colorLight};" onclick="startAssessment('${key}')">
+      <div class="picker-icon">${a.icon}</div>
+      <div class="picker-title">${a.label}</div>
+      <div class="picker-tagline">${a.tagline}</div>
+      <div class="picker-desc">${a.time}</div>
+    </button>
+  `).join('');
+}
 
 let currentType = null;
 let currentIndex = 0;
@@ -136,23 +231,32 @@ let answers = [];
 function startAssessment(type) {
   currentType = type;
   currentIndex = 0;
-  answers = new Array(QUESTIONNAIRES[type].questions.length).fill(null);
+  answers = new Array(ASSESSMENTS[type].questions.length).fill(null);
   document.getElementById('picker-view').style.display = 'none';
   document.getElementById('results-view').style.display = 'none';
-  document.getElementById('quiz-view').style.display = 'block';
+  const quizView = document.getElementById('quiz-view');
+  quizView.style.display = 'block';
+  quizView.style.setProperty('--accent', ASSESSMENTS[type].color);
+  quizView.style.setProperty('--accent-light', ASSESSMENTS[type].colorLight);
   renderQuestion();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function renderQuestion() {
-  const q = QUESTIONNAIRES[currentType];
-  const total = q.questions.length;
+  const a = ASSESSMENTS[currentType];
+  const total = a.questions.length;
   document.getElementById('quiz-progress-fill').style.width = `${(currentIndex / total) * 100}%`;
-  document.getElementById('quiz-step-label').textContent = `Question ${currentIndex + 1} of ${total} · Over the last 2 weeks`;
-  document.getElementById('quiz-question').textContent = q.questions[currentIndex];
+  document.getElementById('quiz-step-label').textContent = `${a.icon} ${a.label} · Question ${currentIndex + 1} of ${total}`;
+
+  const qEl = document.getElementById('quiz-question');
+  qEl.classList.remove('quiz-question-anim');
+  void qEl.offsetWidth; // restart animation
+  qEl.classList.add('quiz-question-anim');
+  qEl.textContent = a.questions[currentIndex];
 
   const optionsEl = document.getElementById('quiz-options');
-  optionsEl.innerHTML = OPTIONS.map((label, val) => `
-    <button class="quiz-option ${answers[currentIndex] === val ? 'selected' : ''}" onclick="selectAnswer(${val})">
+  optionsEl.innerHTML = a.options.map((label, val) => `
+    <button class="quiz-option ${answers[currentIndex] === val ? 'selected' : ''}" style="--i:${val}" onclick="selectAnswer(${val})">
       ${label}
     </button>
   `).join('');
@@ -162,13 +266,19 @@ function renderQuestion() {
 
 function selectAnswer(val) {
   answers[currentIndex] = val;
-  const q = QUESTIONNAIRES[currentType];
-  if (currentIndex < q.questions.length - 1) {
-    currentIndex++;
-    renderQuestion();
-  } else {
-    submitAssessment();
-  }
+  const total = ASSESSMENTS[currentType].questions.length;
+  const btns = document.querySelectorAll('.quiz-option');
+  btns.forEach(b => b.classList.remove('selected'));
+  btns[val].classList.add('selected');
+
+  setTimeout(() => {
+    if (currentIndex < total - 1) {
+      currentIndex++;
+      renderQuestion();
+    } else {
+      submitAssessment();
+    }
+  }, 220);
 }
 
 document.getElementById('quiz-back').addEventListener('click', () => {
@@ -176,53 +286,95 @@ document.getElementById('quiz-back').addEventListener('click', () => {
 });
 
 async function submitAssessment() {
-  if (!getToken()) {
-    if (confirm('Log in to save your results and get personalized suggestions.\n\nLog in now?')) {
-      window.location.href = 'login.html';
+  const a = ASSESSMENTS[currentType];
+  const score = answers.reduce((s, v) => s + v, 0);
+  const severity = severityFor(currentType, score);
+  const flagged_risk = a.selfHarmIndex != null && answers[a.selfHarmIndex] > 0;
+
+  let saved = false;
+  if (getToken()) {
+    try {
+      await api('/api/assessments', { method: 'POST', body: JSON.stringify({ type: currentType, answers }) });
+      saved = true;
+    } catch (err) {
+      console.error('Failed to save assessment:', err);
     }
-    return;
   }
-  try {
-    const result = await api('/api/assessments', {
-      method: 'POST',
-      body: JSON.stringify({ type: currentType, answers })
-    });
-    showResults(result);
-  } catch (err) {
-    alert(`Couldn't save your assessment: ${err.message}`);
-  }
+
+  showResults({ type: currentType, score, severity, flagged_risk, saved });
 }
 
 function showResults(result) {
   document.getElementById('quiz-view').style.display = 'none';
-  document.getElementById('results-view').style.display = 'block';
+  const resultsView = document.getElementById('results-view');
+  resultsView.style.display = 'block';
+
+  const a = ASSESSMENTS[result.type];
+  resultsView.style.setProperty('--accent', a.color);
+  resultsView.style.setProperty('--accent-light', a.colorLight);
 
   document.getElementById('crisis-alert').style.display = result.flagged_risk ? 'block' : 'none';
-  document.getElementById('result-score').textContent = result.score;
-  document.getElementById('result-max').textContent = `/ ${QUESTIONNAIRES[result.type].max}`;
-  document.getElementById('result-severity').textContent = `${result.severity} ${result.type === 'depression' ? 'mood symptoms' : 'anxiety'}`;
+  document.getElementById('result-severity').textContent = `${result.severity} ${a.label.toLowerCase()}`;
+  document.getElementById('result-max').textContent = `/ ${a.max}`;
+  document.getElementById('save-banner').style.display = result.saved ? 'none' : 'flex';
+  document.getElementById('dashboard-link').style.display = result.saved ? 'inline-block' : 'none';
+
+  animateScore(result.score, a.max);
 
   const summaries = {
     Minimal: "What you're describing sounds manageable right now. Keep up whatever's been working for you.",
-    Mild: "You're carrying a bit more than usual right now. Small daily tools — mood tracking, breathing exercises — can genuinely help here.",
-    Moderate: "What you're experiencing is significant enough that extra support would likely help. Consider exploring our courses or talking to a provider.",
-    "Moderately severe": "This is a meaningful amount to carry. Speaking with a mental health professional is a strong next step.",
+    Low: "You're in a good place on this right now.",
+    Good: "Your sleep sounds solid right now — keep protecting it.",
+    Strong: "You're speaking to yourself with real kindness right now.",
+    Mild: "You're carrying a bit more than usual right now. Small daily tools can genuinely help here.",
+    'Mild difficulty': "A few things are getting in the way of good rest. Small routine changes can help.",
+    'Mild self-doubt': "A bit of self-criticism is creeping in. Worth noticing when it shows up.",
+    Moderate: "What you're experiencing is significant enough that extra support would likely help.",
+    'Moderate difficulty': "Sleep is genuinely getting disrupted. Consider adjusting your evening routine.",
+    'Moderate self-doubt': "This pattern of self-talk sounds like it's weighing on you.",
+    High: "This is a meaningful amount to carry. Extra support is a strong next step.",
+    'Moderately severe': "This is a meaningful amount to carry. Speaking with a mental health professional is a strong next step.",
+    'Very high': "This sounds like a lot right now. Please consider reaching out to a professional soon.",
+    'Significant difficulty': "This sounds like a real strain. A professional can help you get real rest back.",
+    'Significant self-doubt': "This sounds heavy to carry. A therapist can help you work with this pattern.",
     Severe: "This sounds really hard right now. Please consider reaching out to a professional soon — you don't have to manage this alone.",
   };
   document.getElementById('result-summary').textContent = summaries[result.severity] || '';
 
   const recommendEl = document.getElementById('result-recommend');
-  if (['Moderate', 'Moderately severe', 'Severe'].includes(result.severity)) {
-    recommendEl.innerHTML = `<a href="help.html" class="btn-primary-a" style="text-decoration:none;">Find a therapist →</a>`;
-  } else {
-    recommendEl.innerHTML = `<a href="learn.html" class="btn-primary-a" style="text-decoration:none;">Explore self-help courses →</a>`;
-  }
+  const needsHelp = ['Moderate', 'Moderately severe', 'Severe', 'High', 'Very high', 'Moderate difficulty', 'Significant difficulty', 'Moderate self-doubt', 'Significant self-doubt'].includes(result.severity);
+  recommendEl.innerHTML = needsHelp
+    ? `<a href="help.html" class="btn-primary-a" style="text-decoration:none;">Find a therapist →</a>`
+    : `<a href="learn.html" class="btn-primary-a" style="text-decoration:none;">Explore self-help courses →</a>`;
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function animateScore(target, max) {
+  const CIRC = 2 * Math.PI * 52;
+  const ring = document.getElementById('result-ring-fill');
+  ring.style.strokeDasharray = CIRC;
+  ring.style.strokeDashoffset = CIRC;
+
+  const scoreEl = document.getElementById('result-score');
+  let current = 0;
+  const duration = 700;
+  const start = performance.now();
+
+  function tick(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    current = Math.round(eased * target);
+    scoreEl.textContent = current;
+    ring.style.strokeDashoffset = CIRC - eased * (target / max) * CIRC;
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
 function backToPicker() {
   document.getElementById('results-view').style.display = 'none';
+  document.getElementById('quiz-view').style.display = 'none';
   document.getElementById('picker-view').style.display = 'block';
 }
 
@@ -230,6 +382,13 @@ document.addEventListener('DOMContentLoaded', () => {
   fetch('header.html').then(r => r.text()).then(html => {
     document.getElementById('header-container').innerHTML = html;
   }).catch(() => {});
+  renderPicker();
+
+  // Deep link support: assessments.html?type=stress jumps straight in
+  const requestedType = new URLSearchParams(window.location.search).get('type');
+  if (requestedType && ASSESSMENTS[requestedType]) {
+    startAssessment(requestedType);
+  }
 });
 </script>
 </body>

@@ -81,7 +81,7 @@
 /* ---------- Sidebar nav ---------- */
 #course-nav {
   position: sticky; top: 16px; background: var(--c-card); border: 1px solid var(--c-border);
-  border-radius: 16px; padding: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.06); max-height: calc(100vh - 40px); overflow-y: auto;
+  border-radius: 16px; padding: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.06); max-height: 80vh; min-height: 420px; overflow-y: auto;
 }
 .nav-module { border-bottom: 1px solid var(--c-border); }
 .nav-module:last-child { border-bottom: none; }
@@ -94,11 +94,12 @@
 .nav-module-count { font-size: 11px; color: var(--c-text-sec); background: var(--c-primary-light); padding: 2px 7px; border-radius: 999px; }
 .nav-caret { transition: transform .2s ease; color: var(--c-text-sec); }
 .nav-module.open .nav-caret { transform: rotate(90deg); }
-.nav-module-body { display: none; padding: 0 6px 10px 34px; }
+.nav-module-body { display: none; padding: 2px 6px 14px 34px; }
 .nav-module.open .nav-module-body { display: block; }
 .nav-lesson {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none;
-  padding: 8px 8px; border-radius: 10px; cursor: pointer; font-size: 13px; color: var(--c-text-sec); font-family: inherit;
+  padding: 12px 10px; border-radius: 10px; cursor: pointer; font-size: 13.5px; line-height: 1.4; color: var(--c-text-sec); font-family: inherit;
+  min-height: 40px;
 }
 .nav-lesson:hover { background: var(--c-primary-light); }
 .nav-lesson.active { background: var(--c-primary-light); color: var(--c-primary); font-weight: 700; }
